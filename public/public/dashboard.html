@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarchandPro — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c0a;
+    --surface: #0f1612;
+    --surface2: #151d18;
+    --border: rgba(0,200,83,0.12);
+    --green: #00c853;
+    --green-dim: rgba(0,200,83,0.08);
+    --green-glow: rgba(0,200,83,0.2);
+    --text: #f0f4f1;
+    --text-mid: #8fa99a;
+    --text-dim: #4a6357;
+    --red: #ff4444;
+    --orange: #ff9800;
+    --blue: #2196f3;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .sidebar { position: fixed; left: 0; top: 0; width: 220px; height: 100vh; background: var(--surface); border-right: 1px solid var(--border); padding: 24px 16px; z-index: 100; display: flex; flex-direction: column; }
+  .logo { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 40px; padding: 0 8px; }
+  .logo span { color: var(--green); }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 14px; color: var(--text-mid); cursor: pointer; transition: all 0.2s; margin-bottom: 4px; }
+  .nav-item:hover, .nav-item.active { background: var(--green-dim); color: var(--green); border: 1px solid var(--border); }
+  .main { margin-left: 220px; padding: 32px; min-height: 100vh; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
+  .page-title { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; }
+  .page-subtitle { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+  .status-badge { display: flex; align-items: center; gap: 8px; background: var(--green-dim); border: 1px solid var(--border); border-radius: 100px; padding: 8px 16px; font-size: 13px; color: var(--green); }
+  .status-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+  .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; position: relative; }
+  .kpi-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .kpi-value { font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 800; }
+  .kpi-value.green { color: var(--green); }
+  .kpi-value.red { color: var(--red); }
+  .kpi-icon { position: absolute; top: 16px; right: 16px; font-size: 24px; opacity: 0.3; }
+  .kpi-sub { font-size: 11px; color: var(--text-dim); margin-top: 8px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
+  .card-title { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
+  .badge { font-size: 11px; background: var(--green-dim); color: var(--green); padding: 4px 10px; border-radius: 100px; }
+  .order-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .order-item:last-child { border-bottom: none; }
+  .order-ref { font-size: 13px; font-weight: 600; color: var(--green); }
+  .order-phone { font-size: 12px; color: var(--text-dim); }
+  .order-status { font-size: 11px; padding: 4px 10px; border-radius: 100px; }
+  .status-nouveau { background: rgba(33,150,243,0.15); color: var(--blue); }
+  .status-confirme { background: rgba(0,200,83,0.15); color: var(--green); }
+  .status-livre { background: rgba(0,200,83,0.25); color: var(--green); }
+  .status-annule { background: rgba(255,68,68,0.15); color: var(--red); }
+  .order-time { font-size: 11px; color: var(--text-dim); }
+  .product-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .product-item:last-child { border-bottom: none; }
+  .product-name { font-size: 14px; font-weight: 500; }
+  .product-price { font-size: 13px; color: var(--green); font-weight: 600; }
+  .product-stock { font-size: 12px; color: var(--text-dim); }
+  .stock-low { color: var(--red) !important; }
+  .whatsapp-input { display: flex; gap: 12px; margin-top: 16px; }
+  .whatsapp-input input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; color: var(--text); font-size: 14px; outline: none; }
+  .btn-green { background: var(--green); color: #000; border: none; border-radius: 10px; padding: 12px 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .whatsapp-response { margin-top: 16px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; font-size: 13px; color: var(--text-mid); display: none; white-space: pre-wrap; }
+  .loading { display: flex; align-items: center; gap: 8px; color: var(--text-dim); font-size: 13px; padding: 32px; }
+  .spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty { text-align: center; padding: 32px; color: var(--text-dim); font-size: 13px; }
+  .refresh-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text-mid); border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
+  .sidebar-bottom { margin-top: auto; padding: 12px; background: var(--green-dim); border: 1px solid var(--border); border-radius: 12px; }
+  .user-name { font-size: 13px; font-weight: 600; }
+  .user-role { font-size: 11px; color: var(--green); margin-top: 2px; }
+  @media (max-width: 768px) { .sidebar { display: none; } .main { margin-left: 0; padding: 16px; } .kpi-grid { grid-template-columns: repeat(2, 1fr); } .grid-2 { grid-template-columns: 1fr; } }
+</style>
+</head><body>
+<div class="sidebar">
+  <div class="logo">Marchand<span>Pro</span></div>
+  <nav>
+    <div class="nav-item active" onclick="showSection('dashboard',this)">
+      <span>📊</span> Dashboard
+    </div>
+    <div class="nav-item" onclick="showSection('commandes',this)">
+      <span>📦</span> Commandes
+    </div>
+    <div class="nav-item" onclick="showSection('produits',this)">
+      <span>🏷️</span> Produits
+    </div>
+    <div class="nav-item" onclick="showSection('clients',this)">
+      <span>👥</span> Clients
+    </div>
+    <div class="nav-item" onclick="showSection('whatsapp',this)">
+      <span>💬</span> WhatsApp
+    </div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="user-name">Mouhamed Sarr</div>
+    <div class="user-role">⭐ Admin</div>
+  </div>
+</div>
+<div class="main">
+  <div class="topbar">
+    <div>
+      <div class="page-title" id="pageTitle">Dashboard</div>
+      <div class="page-subtitle" id="pageSubtitle">Vue d'ensemble</div>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center">
+      <button class="refresh-btn" onclick="loadDashboard()">🔄 Actualiser</button>
+      <div class="status-badge"><div class="status-dot"></div>En ligne</div>
+    </div>
+  </div>
+  <div id="section-dashboard">
+    <div class="kpi-grid" id="kpiGrid">
+      <div class="loading"><div class="spinner"></div> Chargement...</div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Commandes récentes <span class="badge" id="orderCount">0</span></div>
+        <div id="recentOrders"><div class="empty">📦 Aucune commande</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Alertes stock <span class="badge" id="alertCount">0</span></div>
+        <div id="stockAlerts"><div class="empty">✅ Stocks OK</div></div>
+      </div>
+    </div>
+  </div>
+  <div id="section-commandes" style="display:none">
+    <div class="card">
+      <div class="card-title">Toutes les commandes</div>
+      <div id="allOrders"><div class="loading"><div class="spinner"></div> Chargement...</div></div>
+    </div>
+  </div>
+  <div id="section-produits" style="display:none">
+    <div class="card">
+      <div class="card-title">Catalogue produits</div>
+      <div id="allProducts"><div class="loading"><div class="spinner"></div> Chargement...</div></div>
+    </div>
+  </div>
+  <div id="section-clients" style="display:none">
+    <div class="card">
+      <div class="card-title">Clients</div>
+      <div id="allClients"><div class="loading"><div class="spinner"></div> Chargement...</div></div>
+    </div>
+  </div>
+  <div id="section-whatsapp" style="display:none">
+    <div class="card">
+      <div class="card-title">💬 Test WhatsApp</div>
+      <p style="font-size:13px;color:var(--text-dim)">Simule une commande client</p>
+      <div class="whatsapp-input">
+        <input type="text" id="waInput" placeholder="je veux 3 sacs de riz..."/>
+        <button class="btn-green" onclick="testWhatsapp()">Envoyer</button>
+      </div>
+      <div class="whatsapp-response" id="waResponse"></div>
+    </div>
+    <div class="card" style="margin-top:20px">
+      <div class="card-title">Infos Webhook</div>
+      <div style="background:var(--surface2);border-radius:10px;padding:16px;font-size:13px">
+        <div style="color:var(--text-dim)">URL Webhook :</div>
+        <div style="color:var(--green);font-family:monospace;font-size:12px;margin-top:4px">https://marchandpro.onrender.com/webhook/whatsapp</div>
+        <div style="color:var(--text-dim);margin-top:12px">Numéro Sandbox :</div>
+        <div style="font-weight:600;margin-top:4px">+1 415 523 8886</div>
+      </div>
+    </div>
+  </div>
+</div><script>
+const API = 'https://marchandpro.onrender.com';
+const TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwibmFtZSI6Ik1vdWhhbWVkIiwiZW1haWwiOiJtb3VoYW1lZEBtYXJjaGFuZHByby5jb20iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NzI3NTMzMDl9.U5RrfJArIOXFgEEETMKVpzaRIXNrZHpCr7yoE-V169E';
+
+async function apiFetch(url) {
+  try {
+    const res = await fetch(API + url, {
+      headers: { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' }
+    });
+    return await res.json();
+  } catch(e) { return null; }
+}
+
+function formatFCFA(n) {
+  return new Intl.NumberFormat('fr-FR').format(n) + ' FCFA';
+}
+
+function timeAgo(date) {
+  const mins = Math.floor((Date.now() - new Date(date)) / 60000);
+  if (mins < 1) return 'À l\'instant';
+  if (mins < 60) return `Il y a ${mins}min`;
+  return `Il y a ${Math.floor(mins/60)}h`;
+}
+
+async function loadDashboard() {
+  const data = await apiFetch('/dashboard');
+  if (!data) return;
+  const { kpis, commandes_recentes, alertes } = data;
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi-card"><div class="kpi-icon">📦</div><div class="kpi-label">Commandes</div><div class="kpi-value">${kpis.commandes}</div><div class="kpi-sub">Total reçues</div></div>
+    <div class="kpi-card"><div class="kpi-icon">💰</div><div class="kpi-label">Revenus</div><div class="kpi-value green">${formatFCFA(kpis.revenus_fcfa)}</div><div class="kpi-sub">Livrées</div></div>
+    <div class="kpi-card"><div class="kpi-icon">🧾</div><div class="kpi-label">Impayés</div><div class="kpi-value ${kpis.impayes > 0 ? 'red' : ''}">${kpis.impayes}</div><div class="kpi-sub">En attente</div></div>
+    <div class="kpi-card"><div class="kpi-icon">👥</div><div class="kpi-label">Clients</div><div class="kpi-value">${kpis.clients}</div><div class="kpi-sub">Enregistrés</div></div>
+  `;
+  document.getElementById('orderCount').textContent = commandes_recentes.length;
+  document.getElementById('recentOrders').innerHTML = commandes_recentes.length === 0
+    ? '<div class="empty">📦 Aucune commande</div>'
+    : commandes_recentes.map(o => `
+      <div class="order-item">
+        <div><div class="order-ref">CMD-${String(o.id).padStart(4,'0')}</div><div class="order-phone">${o.customer_phone || 'WhatsApp'}</div></div>
+        <span class="order-status status-${o.status}">${o.status}</span>
+        <div class="order-time">${timeAgo(o.created_at)}</div>
+      </div>`).join('');
+  document.getElementById('alertCount').textContent = alertes.stock_faible.length;
+  document.getElementById('stockAlerts').innerHTML = alertes.stock_faible.length === 0
+    ? '<div class="empty">✅ Stocks OK</div>'
+    : alertes.stock_faible.map(p => `<div class="product-item"><div class="product-name">${p.name}</div><span class="product-stock stock-low">⚠️ ${p.stock}</span></div>`).join('');
+}
+
+async function loadProducts() {
+  const data = await apiFetch('/api/products');
+  document.getElementById('allProducts').innerHTML = !data ? '<div class="empty">Erreur</div>'
+    : data.map(p => `<div class="product-item"><div><div class="product-name">${p.name}</div><div class="product-stock">${p.stock} ${p.unit}</div></div><div class="product-price">${formatFCFA(p.price)}</div></div>`).join('');
+}
+
+async function loadOrders() {
+  const data = await apiFetch('/api/orders');
+  document.getElementById('allOrders').innerHTML = !data || data.length === 0
+    ? '<div class="empty">📦 Aucune commande</div>'
+    : data.map(o => `<div class="order-item"><div><div class="order-ref">CMD-${String(o.id).padStart(4,'0')}</div><div class="order-phone">${o.customer_phone || 'WhatsApp'}</div></div><span class="order-status status-${o.status}">${o.status}</span><div class="order-time">${timeAgo(o.created_at)}</div></div>`).join('');
+}
+
+async function loadClients() {
+  const data = await apiFetch('/api/clients');
+  document.getElementById('allClients').innerHTML = !data || data.length === 0
+    ? '<div class="empty">👥 Aucun client</div>'
+    : data.map(c => `<div class="product-item"><div><div class="product-name">${c.name || c.phone}</div><div class="product-stock">${c.phone}</div></div><div class="product-price">${c.total_orders} commandes</div></div>`).join('');
+}
+
+async function testWhatsapp() {
+  const msg = document.getElementById('waInput').value;
+  if (!msg) return;
+  const resp = document.getElementById('waResponse');
+  resp.style.display = 'block';
+  resp.textContent = '⏳ Traitement...';
+  try {
+    const res = await fetch(API + '/webhook/whatsapp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `Body=${encodeURIComponent(msg)}&From=whatsapp:+221700000000`
+    });
+    const text = await res.text();
+    const match = text.match(/<Body>([\s\S]*?)<\/Body>/);
+    resp.textContent = match ? match[1] : '✅ Réponse reçue';
+  } catch(e) { resp.textContent = '❌ Erreur connexion'; }
+}
+
+function showSection(name, el) {
+  ['dashboard','commandes','produits','clients','whatsapp'].forEach(s => {
+    document.getElementById('section-' + s).style.display = s === name ? 'block' : 'none';
+  });
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  if (name === 'produits') loadProducts();
+  else if (name === 'commandes') loadOrders();
+  else if (name === 'clients') loadClients();
+}
+
+loadDashboard();
+setInterval(loadDashboard, 30000);
+</script>
+</body>
+</html>
