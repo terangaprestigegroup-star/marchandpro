@@ -61,8 +61,6 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     );
   `);
-  await pool.query(`ALTER TABLE orders ALTER COLUMN customer_phone TYPE VARCHAR(50)`).catch(()=>{});
-  await pool.query(`ALTER TABLE clients ALTER COLUMN phone TYPE VARCHAR(50)`).catch(()=>{});
   console.log('✅ Base de données MarchandPro initialisée');
 }
 
@@ -219,6 +217,16 @@ app.get('/api/roi', authMiddleware, async (req, res) => {
   const commandes = await pool.query("SELECT COUNT(*) FROM orders WHERE created_at > NOW() - INTERVAL '30 days'");
   const revenus = await pool.query("SELECT COALESCE(SUM(total),0) as total FROM orders WHERE status='livré' AND created_at > NOW() - INTERVAL '30 days'");
   res.json({ periode: '30 derniers jours', commandes: parseInt(commandes.rows[0].count), revenus_fcfa: parseFloat(revenus.rows[0].total), cout_abonnement: 10000, roi: `${Math.round((parseFloat(revenus.rows[0].total) / 10000) * 100)}%` });
+});
+
+app.get('/migrate', async (req, res) => {
+  try {
+    await pool.query(`ALTER TABLE orders ALTER COLUMN customer_phone TYPE VARCHAR(50)`);
+    await pool.query(`ALTER TABLE clients ALTER COLUMN phone TYPE VARCHAR(50)`);
+    res.json({ ok: true, message: 'Migration reussie!' });
+  } catch(err) {
+    res.json({ ok: false, error: err.message });
+  }
 });
 
 app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
