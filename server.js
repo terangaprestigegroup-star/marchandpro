@@ -60,9 +60,9 @@ async function initDB() {
       total_spent DECIMAL DEFAULT 0,
       created_at TIMESTAMP DEFAULT NOW()
     );
-    ALTER TABLE orders ALTER COLUMN customer_phone TYPE VARCHAR(50);
-    ALTER TABLE clients ALTER COLUMN phone TYPE VARCHAR(50);
   `);
+  await pool.query(`ALTER TABLE orders ALTER COLUMN customer_phone TYPE VARCHAR(50)`).catch(()=>{});
+  await pool.query(`ALTER TABLE clients ALTER COLUMN phone TYPE VARCHAR(50)`).catch(()=>{});
   console.log('✅ Base de données MarchandPro initialisée');
 }
 
@@ -119,14 +119,15 @@ app.post('/webhook/whatsapp', async (req, res) => {
   try {
     const message = req.body.Body || '';
     const expediteur = req.body.From || '';
-    console.log('📱 Message reçu:', message, 'de', expediteur);
+    const phone = expediteur.substring(0, 49);
+    console.log('📱 Message reçu:', message, 'de', phone);
     const produits = parserCommande(message);
     let reponse = '';
     if (produits.length > 0) {
       const count = await pool.query('SELECT COUNT(*) FROM orders');
       const ref = `CMD-${String(parseInt(count.rows[0].count) + 1).padStart(4, '0')}`;
-      await pool.query('INSERT INTO orders (customer_phone, items, status) VALUES ($1, $2, $3)', [expediteur, JSON.stringify(produits), 'nouveau']);
-      await pool.query(`INSERT INTO clients (phone, total_orders) VALUES ($1, 1) ON CONFLICT (phone) DO UPDATE SET total_orders = clients.total_orders + 1`, [expediteur]);
+      await pool.query('INSERT INTO orders (customer_phone, items, status) VALUES ($1, $2, $3)', [phone, JSON.stringify(produits), 'nouveau']);
+      await pool.query(`INSERT INTO clients (phone, total_orders) VALUES ($1, 1) ON CONFLICT (phone) DO UPDATE SET total_orders = clients.total_orders + 1`, [phone]);
       reponse = `✅ *MarchandPro* — Commande reçue !\n\n`;
       produits.forEach(p => { reponse += `• ${p.quantite} ${p.unite} de ${p.produit}\n`; });
       reponse += `\n📋 Référence : ${ref}\n⏳ Confirmation sous peu. Merci ! 🙏`;
