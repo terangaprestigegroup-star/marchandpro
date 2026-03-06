@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const twilio = require('twilio');
 
 const app = express();
-app.use(express.json());
+app.use(express.json());app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
 
 const pool = new Pool({
