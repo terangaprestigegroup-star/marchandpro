@@ -239,6 +239,5 @@ setInterval(() => {
   fetch('https://marchandpro.onrender.com/health').catch(()=>{});
 }, 840000);
 
-initDB().then(() => {
-  app.listen(3000, () => console.log('🚀 MarchandPro démarré sur port 3000'));
+initDB().then(() => {app.listen(process.env.PORT || 3000, () => console.log('🚀 MarchandPro démarré sur port ' + (process.env.PORT || 3000)));
 }).catch(err => console.error('Erreur démarrage:', err));
