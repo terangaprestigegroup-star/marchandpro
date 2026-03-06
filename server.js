@@ -120,21 +120,23 @@ app.post('/webhook/whatsapp', async (req, res) => {
     const phone = expediteur.substring(0, 49);
     console.log('📱 Message reçu:', message, 'de', phone);
     const produits = parserCommande(message);
-    let reponse = '';
     if (produits.length > 0) {
       const count = await pool.query('SELECT COUNT(*) FROM orders');
       const ref = `CMD-${String(parseInt(count.rows[0].count) + 1).padStart(4, '0')}`;
-      await pool.query('INSERT INTO orders (customer_phone, items, status) VALUES ($1, $2, $3)', [phone, JSON.stringify(produits), 'nouveau']);
-      await pool.query(`INSERT INTO clients (phone, total_orders) VALUES ($1, 1) ON CONFLICT (phone) DO UPDATE SET total_orders = clients.total_orders + 1`, [phone]);
-      reponse = `✅ *MarchandPro* — Commande reçue !\n\n`;
+      let reponse = `✅ *MarchandPro* — Commande reçue !\n\n`;
       produits.forEach(p => { reponse += `• ${p.quantite} ${p.unite} de ${p.produit}\n`; });
       reponse += `\n📋 Référence : ${ref}\n⏳ Confirmation sous peu. Merci ! 🙏`;
+      const twiml = new twilio.twiml.MessagingResponse();
+      twiml.message(reponse);
+      res.type('text/xml').send(twiml.toString());
+      pool.query('INSERT INTO orders (customer_phone, items, status) VALUES ($1, $2, $3)', [phone, JSON.stringify(produits), 'nouveau']);
+      pool.query(`INSERT INTO clients (phone, total_orders) VALUES ($1, 1) ON CONFLICT (phone) DO UPDATE SET total_orders = clients.total_orders + 1`, [phone]);
     } else {
-      reponse = `👋 Bienvenue sur *MarchandPro* !\n\nPour commander, écrivez :\n_"je veux 3 sacs de riz et 2 bidons d'huile"_\n\nNous traitons votre commande automatiquement. 📦`;
+      const reponse = `👋 Bienvenue sur *MarchandPro* !\n\nPour commander, écrivez :\n_"je veux 3 sacs de riz et 2 bidons d'huile"_\n\nNous traitons votre commande automatiquement. 📦`;
+      const twiml = new twilio.twiml.MessagingResponse();
+      twiml.message(reponse);
+      res.type('text/xml').send(twiml.toString());
     }
-    const twiml = new twilio.twiml.MessagingResponse();
-    twiml.message(reponse);
-    res.type('text/xml').send(twiml.toString());
   } catch (err) {
     console.error('Webhook error:', err);
     res.status(500).send('Erreur serveur');
