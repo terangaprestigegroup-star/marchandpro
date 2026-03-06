@@ -217,7 +217,9 @@ app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashb
 app.get('/health', (req, res) => res.json({ status: 'ok', app: 'MarchandPro', version: '1.0.0' }));
 
 app.get('/', (req, res) => res.json({ message: 'Bienvenue sur MarchandPro API 🇸🇳', status: 'running' }));
-
+setInterval(() => {
+  fetch('https://marchandpro.onrender.com/health').catch(()=>{});
+}, 840000);
 initDB().then(() => {
   app.listen(3000, () => console.log('🚀 MarchandPro démarré sur port 3000'));
 }).catch(err => console.error('Erreur démarrage:', err));
