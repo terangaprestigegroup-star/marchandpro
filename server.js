@@ -1,4 +1,3 @@
-
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -38,7 +37,7 @@ async function initDB() {
     );
     CREATE TABLE IF NOT EXISTS orders (
       id SERIAL PRIMARY KEY,
-      customer_phone VARCHAR(20),
+      customer_phone VARCHAR(50),
       customer_name VARCHAR(100),
       items JSONB,
       total DECIMAL DEFAULT 0,
@@ -55,12 +54,14 @@ async function initDB() {
     );
     CREATE TABLE IF NOT EXISTS clients (
       id SERIAL PRIMARY KEY,
-      phone VARCHAR(20) UNIQUE,
+      phone VARCHAR(50) UNIQUE,
       name VARCHAR(100),
       total_orders INTEGER DEFAULT 0,
       total_spent DECIMAL DEFAULT 0,
       created_at TIMESTAMP DEFAULT NOW()
     );
+    ALTER TABLE orders ALTER COLUMN customer_phone TYPE VARCHAR(50);
+    ALTER TABLE clients ALTER COLUMN phone TYPE VARCHAR(50);
   `);
   console.log('✅ Base de données MarchandPro initialisée');
 }
