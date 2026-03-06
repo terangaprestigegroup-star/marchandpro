@@ -1,11 +1,14 @@
-const express = require('express');const cors = require('cors');
+
+const express = require('express');
+const cors = require('cors');
 const path = require('path');
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const twilio = require('twilio');
 
-const app = express();app.use(cors());
+const app = express();
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -115,6 +118,7 @@ app.post('/webhook/whatsapp', async (req, res) => {
   try {
     const message = req.body.Body || '';
     const expediteur = req.body.From || '';
+    console.log('📱 Message reçu:', message, 'de', expediteur);
     const produits = parserCommande(message);
     let reponse = '';
     if (produits.length > 0) {
@@ -131,7 +135,10 @@ app.post('/webhook/whatsapp', async (req, res) => {
     const twiml = new twilio.twiml.MessagingResponse();
     twiml.message(reponse);
     res.type('text/xml').send(twiml.toString());
-  } catch (err) { res.status(500).send('Erreur serveur'); }
+  } catch (err) {
+    console.error('Webhook error:', err);
+    res.status(500).send('Erreur serveur');
+  }
 });
 
 app.get('/api/products', authMiddleware, async (req, res) => {
@@ -213,13 +220,13 @@ app.get('/api/roi', authMiddleware, async (req, res) => {
 });
 
 app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
-
 app.get('/health', (req, res) => res.json({ status: 'ok', app: 'MarchandPro', version: '1.0.0' }));
-
 app.get('/', (req, res) => res.json({ message: 'Bienvenue sur MarchandPro API 🇸🇳', status: 'running' }));
+
 setInterval(() => {
   fetch('https://marchandpro.onrender.com/health').catch(()=>{});
 }, 840000);
+
 initDB().then(() => {
   app.listen(3000, () => console.log('🚀 MarchandPro démarré sur port 3000'));
 }).catch(err => console.error('Erreur démarrage:', err));
