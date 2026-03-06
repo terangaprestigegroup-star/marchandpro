@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -6,26 +7,17 @@
 <title>MarchandPro — Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#080c0a;
-  --surface:#0f1612;
-  --surface2:#151d18;
-  --border:rgba(0,200,83,0.12);
-  --green:#00c853;
-  --green-dim:rgba(0,200,83,0.08);
-  --text:#f0f4f1;
-  --text-mid:#8fa99a;
-  --text-dim:#4a6357;
-  --red:#ff4444;
-  --blue:#2196f3;
-}
+:root{--bg:#080c0a;--surface:#0f1612;--surface2:#151d18;--border:rgba(0,200,83,0.12);--green:#00c853;--green-dim:rgba(0,200,83,0.08);--text:#f0f4f1;--text-mid:#8fa99a;--text-dim:#4a6357;--red:#ff4444;--blue:#2196f3;}
 *{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:70px;}
 .sidebar{position:fixed;left:0;top:0;width:220px;height:100vh;background:var(--surface);border-right:1px solid var(--border);padding:24px 16px;z-index:100;display:flex;flex-direction:column;}
 .logo{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:40px;}
 .logo span{color:var(--green);}
 .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;font-size:14px;color:var(--text-mid);cursor:pointer;margin-bottom:4px;}
 .nav-item.active,.nav-item:hover{background:var(--green-dim);color:var(--green);border:1px solid var(--border);}
+.sidebar-bottom{margin-top:auto;padding:12px;background:var(--green-dim);border:1px solid var(--border);border-radius:12px;}
+.user-name{font-size:13px;font-weight:600;}
+.user-role{font-size:11px;color:var(--green);margin-top:2px;}
 .main{margin-left:220px;padding:32px;}
 .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:32px;}
 .page-title{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;}
@@ -70,37 +62,62 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 @keyframes spin{to{transform:rotate(360deg);}}
 .empty{text-align:center;padding:32px;color:var(--text-dim);font-size:13px;}
 .refresh-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text-mid);border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;}
-.sidebar-bottom{margin-top:auto;padding:12px;background:var(--green-dim);border:1px solid var(--border);border-radius:12px;}
-.user-name{font-size:13px;font-weight:600;}
-.user-role{font-size:11px;color:var(--green);margin-top:2px;}
-@media(max-width:768px){.sidebar{display:none;}.main{margin-left:0;padding:16px;}.kpi-grid{grid-template-columns:1fr;}}
+
+/* MOBILE NAV */
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);z-index:200;padding:8px 0;}
+.mobile-nav-items{display:flex;justify-content:space-around;}
+.mobile-nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 12px;border-radius:10px;cursor:pointer;color:var(--text-dim);font-size:10px;min-width:60px;}
+.mobile-nav-item.active{color:var(--green);}
+.mobile-nav-item .icon{font-size:20px;}
+
+@media(max-width:768px){
+  .sidebar{display:none;}
+  .mobile-nav{display:block;}
+  .main{margin-left:0;padding:16px;}
+  .kpi-grid{grid-template-columns:repeat(2,1fr);}
+  .grid-2{grid-template-columns:1fr;}
+  .topbar{flex-direction:column;align-items:flex-start;gap:12px;}
+}
 </style>
 </head>
 <body>
+
 <div class="sidebar">
   <div class="logo">Marchand<span>Pro</span></div>
   <nav>
-    <div class="nav-item active" onclick="showSection('dashboard',this)">
-      <span>📊</span> Dashboard
-    </div>
-    <div class="nav-item" onclick="showSection('commandes',this)">
-      <span>📦</span> Commandes
-    </div>
-    <div class="nav-item" onclick="showSection('produits',this)">
-      <span>🏷️</span> Produits
-    </div>
-    <div class="nav-item" onclick="showSection('clients',this)">
-      <span>👥</span> Clients
-    </div>
-    <div class="nav-item" onclick="showSection('whatsapp',this)">
-      <span>💬</span> WhatsApp
-    </div>
+    <div class="nav-item active" onclick="showSection('dashboard',this)"><span>📊</span> Dashboard</div>
+    <div class="nav-item" onclick="showSection('commandes',this)"><span>📦</span> Commandes</div>
+    <div class="nav-item" onclick="showSection('produits',this)"><span>🏷️</span> Produits</div>
+    <div class="nav-item" onclick="showSection('clients',this)"><span>👥</span> Clients</div>
+    <div class="nav-item" onclick="showSection('whatsapp',this)"><span>💬</span> WhatsApp</div>
   </nav>
   <div class="sidebar-bottom">
     <div class="user-name">Mouhamed Sarr</div>
     <div class="user-role">⭐ Admin</div>
   </div>
 </div>
+
+<!-- MOBILE NAV -->
+<div class="mobile-nav">
+  <div class="mobile-nav-items">
+    <div class="mobile-nav-item active" onclick="showMobile('dashboard',this)">
+      <span class="icon">📊</span>Home
+    </div>
+    <div class="mobile-nav-item" onclick="showMobile('commandes',this)">
+      <span class="icon">📦</span>Commandes
+    </div>
+    <div class="mobile-nav-item" onclick="showMobile('produits',this)">
+      <span class="icon">🏷️</span>Produits
+    </div>
+    <div class="mobile-nav-item" onclick="showMobile('clients',this)">
+      <span class="icon">👥</span>Clients
+    </div>
+    <div class="mobile-nav-item" onclick="showMobile('whatsapp',this)">
+      <span class="icon">💬</span>WhatsApp
+    </div>
+  </div>
+</div>
+
 <div class="main">
   <div class="topbar">
     <div>
@@ -109,12 +126,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     </div>
     <div style="display:flex;gap:12px;align-items:center">
       <button class="refresh-btn" onclick="loadDashboard()">🔄 Actualiser</button>
-      <div class="status-badge">
-        <div class="status-dot"></div>
-        En ligne
-      </div>
+      <div class="status-badge"><div class="status-dot"></div>En ligne</div>
     </div>
   </div>
+
   <div id="section-dashboard">
     <div class="kpi-grid" id="kpiGrid">
       <div class="loading"><div class="spinner"></div> Chargement...</div>
@@ -130,24 +145,28 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       </div>
     </div>
   </div>
+
   <div id="section-commandes" style="display:none">
     <div class="card">
       <div class="card-title">Toutes les commandes</div>
       <div id="allOrders"><div class="loading"><div class="spinner"></div> Chargement...</div></div>
     </div>
   </div>
+
   <div id="section-produits" style="display:none">
     <div class="card">
       <div class="card-title">Catalogue produits</div>
       <div id="allProducts"><div class="loading"><div class="spinner"></div> Chargement...</div></div>
     </div>
   </div>
+
   <div id="section-clients" style="display:none">
     <div class="card">
       <div class="card-title">Clients</div>
       <div id="allClients"><div class="loading"><div class="spinner"></div> Chargement...</div></div>
     </div>
   </div>
+
   <div id="section-whatsapp" style="display:none">
     <div class="card">
       <div class="card-title">💬 Test WhatsApp</div>
@@ -162,15 +181,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
       <div class="card-title">Infos Webhook</div>
       <div style="background:var(--surface2);border-radius:10px;padding:16px;font-size:13px">
         <div style="color:var(--text-dim)">URL Webhook :</div>
-        <div style="color:var(--green);font-family:monospace;font-size:12px;margin-top:4px">
-          https://marchandpro.onrender.com/webhook/whatsapp
-        </div>
+        <div style="color:var(--green);font-family:monospace;font-size:12px;margin-top:4px">https://marchandpro.onrender.com/webhook/whatsapp</div>
         <div style="color:var(--text-dim);margin-top:12px">Numéro Sandbox :</div>
         <div style="font-weight:600;margin-top:4px">+1 415 523 8886</div>
       </div>
     </div>
   </div>
-</div><script>
+</div>
+
+<script>
 const API='https://marchandpro.onrender.com';
 const TOKEN='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwibmFtZSI6Ik1vdWhhbWVkIiwiZW1haWwiOiJtb3VoYW1lZEBtYXJjaGFuZHByby5jb20iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NzI3NTMzMDl9.U5RrfJArIOXFgEEETMKVpzaRIXNrZHpCr7yoE-V169E';
 
@@ -182,7 +201,6 @@ async function apiFetch(url){
 }
 
 function formatFCFA(n){return new Intl.NumberFormat('fr-FR').format(n)+' FCFA';}
-
 function timeAgo(date){
   const mins=Math.floor((Date.now()-new Date(date))/60000);
   if(mins<1)return 'À l\'instant';
@@ -249,6 +267,19 @@ function showSection(name,el){
   });
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   el.classList.add('active');
+  if(name==='produits')loadProducts();
+  else if(name==='commandes')loadOrders();
+  else if(name==='clients')loadClients();
+}
+
+function showMobile(name,el){
+  ['dashboard','commandes','produits','clients','whatsapp'].forEach(s=>{
+    document.getElementById('section-'+s).style.display=s===name?'block':'none';
+  });
+  document.querySelectorAll('.mobile-nav-item').forEach(n=>n.classList.remove('active'));
+  el.classList.add('active');
+  const titles={dashboard:'Dashboard',commandes:'Commandes',produits:'Produits',clients:'Clients',whatsapp:'WhatsApp'};
+  document.getElementById('pageTitle').textContent=titles[name];
   if(name==='produits')loadProducts();
   else if(name==='commandes')loadOrders();
   else if(name==='clients')loadClients();
