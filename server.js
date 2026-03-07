@@ -297,7 +297,7 @@ app.post('/webhook/whatsapp', async (req, res) => {
             let reponseIA = null;
             try {
               reponseIA = await demanderGroq(message.text.body, contexte);
-              console.log('Groq OK:', reponseIA);
+              console.log('Groq reponse v3:', reponseIA);
             } catch(err) {
               console.error('Groq erreur:', err.message);
             }
