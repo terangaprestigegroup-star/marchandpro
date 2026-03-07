@@ -293,7 +293,13 @@ app.post('/webhook/whatsapp', async (req, res) => {
             // Groq répond à tout message non reconnu
             const historique = await pool.query('SELECT COUNT(*) FROM orders WHERE customer_phone=$1', [phone]);
             const contexte = `Ce client a ${historique.rows[0].count} commandes passées.`;
-            const reponseIA = await demanderGroq(message.text.body, contexte);
+            let reponseIA = null;
+            try {
+              reponseIA = await demanderGroq(message.text.body, contexte);
+              console.log('Groq OK:', reponseIA);
+            } catch(err) {
+              console.error('Groq erreur:', err.message);
+            }
             await envoyerWhatsApp(phone_id, phone, reponseIA ||
               `👋 Bienvenue sur *MarchandPro* ! 🇸🇳\n\n1️⃣ *catalogue* — voir nos produits\n2️⃣ *commander* — passer une commande\n3️⃣ *mes commandes* — voir vos commandes`
             );
