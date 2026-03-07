@@ -324,11 +324,58 @@ app.post('/webhook/whatsapp', async (req, res) => {
             reponse += `\n📋 Référence : ${ref}\n⏳ Confirmation sous peu. Merci ! 🙏`;
 
             await pool.query('INSERT INTO orders (customer_phone, items, total, status) VALUES ($1, $2, $3, $4)',
-              [phone, JSON.stringify(produits), total, 'nouveau']);
+              [phone, JSON.stringify(produits), totalApresRemise, 'nouveau']);
             await pool.query(`INSERT INTO clients (phone, total_orders, total_spent) VALUES ($1, 1, $2) ON CONFLICT (phone) DO UPDATE SET total_orders = clients.total_orders + 1, total_spent = clients.total_spent + $2`,
-              [phone, total]);
+              [phone, totalApresRemise]);
 
             await envoyerWhatsApp(phone_id, phone, reponse);
+
+            // Générer lien de paiement PayDunya si total > 0
+            if (totalApresRemise > 0) {
+              try {
+                const paydunyaRes = await fetch('https://app.paydunya.com/sandbox-api/v1/checkout-invoice/create', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'PAYDUNYA-MASTER-KEY': process.env.PAYDUNYA_TOKEN,
+                    'PAYDUNYA-PUBLIC-KEY': process.env.PAYDUNYA_PUBLIC_KEY,
+                    'PAYDUNYA-PRIVATE-KEY': process.env.PAYDUNYA_PRIVATE_KEY,
+                    'PAYDUNYA-MODE': 'test'
+                  },
+                  body: JSON.stringify({
+                    invoice: {
+                      total_amount: totalApresRemise,
+                      description: `Commande ${ref} — MarchandPro`
+                    },
+                    store: {
+                      name: 'MarchandPro',
+                      tagline: 'Votre grossiste digital 🇸🇳',
+                      phone: '+221711288439',
+                      website_url: 'https://marchandpro-production-b529.up.railway.app'
+                    },
+                    actions: {
+                      cancel_url: 'https://marchandpro-production-b529.up.railway.app',
+                      return_url: 'https://marchandpro-production-b529.up.railway.app',
+                      callback_url: 'https://marchandpro-production-b529.up.railway.app/api/paydunya/webhook'
+                    }
+                  })
+                });
+                const paydunyaData = await paydunyaRes.json();
+                console.log('PayDunya:', JSON.stringify(paydunyaData).substring(0, 200));
+
+                if (paydunyaData.response_code === '00' && paydunyaData.response_text) {
+                  const lienPaiement = paydunyaData.response_text;
+                  await envoyerWhatsApp(phone_id, phone,
+                    `💳 *Payez votre commande ${ref}*\n\n` +
+                    `Montant : *${totalApresRemise.toLocaleString('fr-FR')} FCFA*\n\n` +
+                    `👇 Cliquez ici pour payer via Orange Money ou Wave :\n${lienPaiement}\n\n` +
+                    `✅ Votre commande sera confirmée automatiquement après paiement.`
+                  );
+                }
+              } catch(payErr) {
+                console.error('PayDunya erreur:', payErr.message);
+              }
+            }
           } else {
             // Groq répond à tout message non reconnu
             const historique = await pool.query('SELECT COUNT(*) FROM orders WHERE customer_phone=$1', [phone]);
@@ -437,6 +484,27 @@ app.get('/migrate', async (req, res) => {
 });
 
 app.get('/api/catalogue', (req, res) => res.json(CATALOGUE));
+
+// Webhook PayDunya — confirmation de paiement
+app.post('/api/paydunya/webhook', async (req, res) => {
+  try {
+    const data = req.body;
+    console.log('PayDunya webhook:', JSON.stringify(data).substring(0, 300));
+    if (data.status === 'completed') {
+      const description = data.invoice?.description || '';
+      const refMatch = description.match(/CMD-(\d+)/i);
+      if (refMatch) {
+        const cmdId = parseInt(refMatch[1]);
+        await pool.query('UPDATE orders SET status=$1 WHERE id=$2', ['payé', cmdId]);
+        console.log(`✅ Commande CMD-${String(cmdId).padStart(4,'0')} marquée payée`);
+      }
+    }
+    res.status(200).json({ ok: true });
+  } catch(err) {
+    console.error('PayDunya webhook erreur:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 app.get('/health', (req, res) => res.json({ status: 'ok', app: 'MarchandPro', version: '2.0.0' }));
 app.get('/', (req, res) => res.json({ message: 'Bienvenue sur MarchandPro API 🇸🇳', version: '2.0.0', status: 'running' }));
