@@ -85,7 +85,7 @@ function formaterCatalogue() {
 
 function parserCommande(message) {
   const produits = [];
-  const regex = /(\d+)\s*(sacs?|bidons?|boites?|kg|litres?|unités?|cartons?|paquets?)\s+(?:de\s+)?(\w+)/gi;
+  const regex = /(\d+)\s*(sacs?|bidons?|boites?|kg|litres?|unités?|cartons?|paquets?)\s+(?:d[e']?\s+)?(\w+)/gi;
   let match;
   while ((match = regex.exec(message)) !== null) {
     const quantite = parseInt(match[1]);
