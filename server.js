@@ -593,7 +593,7 @@ function planifierRelances() {
 
 initDB().then(() => {
   app.listen(process.env.PORT || 3000, () => {
-    console.log('🚀 MarchandPro v2.0 démarré sur port ' + (process.env.PORT || 3000));
+    console.log('🚀 MarchandPro v2.1 démarré sur port ' + (process.env.PORT || 3000));
     planifierRelances();
   });
 }).catch(err => console.error('Erreur démarrage:', err));
