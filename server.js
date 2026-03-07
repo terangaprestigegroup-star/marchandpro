@@ -4,7 +4,6 @@ const path = require('path');
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const twilio = require('twilio');
 
 const app = express();
 app.use(cors());
@@ -113,30 +112,52 @@ app.post('/api/login', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/webhook/whatsapp', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  if (mode === 'subscribe' && token === 'marchandpro2026') {
+    res.status(200).send(challenge);
+  } else {
+    res.status(403).send('Forbidden');
+  }
+});
+
 app.post('/webhook/whatsapp', async (req, res) => {
   try {
-    const message = req.body.Body || '';
-    const expediteur = req.body.From || '';
-    const phone = expediteur.substring(0, 49);
-    console.log('📱 Message reçu:', message, 'de', phone);
-    const produits = parserCommande(message);
-    if (produits.length > 0) {
-      const count = await pool.query('SELECT COUNT(*) FROM orders');
-      const ref = `CMD-${String(parseInt(count.rows[0].count) + 1).padStart(4, '0')}`;
-      let reponse = `✅ *MarchandPro* — Commande reçue !\n\n`;
-      produits.forEach(p => { reponse += `• ${p.quantite} ${p.unite} de ${p.produit}\n`; });
-      reponse += `\n📋 Référence : ${ref}\n⏳ Confirmation sous peu. Merci ! 🙏`;
-      const twiml = new twilio.twiml.MessagingResponse();
-      twiml.message(reponse);
-      res.type('text/xml').send(twiml.toString());
-      pool.query('INSERT INTO orders (customer_phone, items, status) VALUES ($1, $2, $3)', [phone, JSON.stringify(produits), 'nouveau']);
-      pool.query(`INSERT INTO clients (phone, total_orders) VALUES ($1, 1) ON CONFLICT (phone) DO UPDATE SET total_orders = clients.total_orders + 1`, [phone]);
-    } else {
-      const reponse = `👋 Bienvenue sur *MarchandPro* !\n\nPour commander, écrivez :\n_"je veux 3 sacs de riz et 2 bidons d'huile"_\n\nNous traitons votre commande automatiquement. 📦`;
-      const twiml = new twilio.twiml.MessagingResponse();
-      twiml.message(reponse);
-      res.type('text/xml').send(twiml.toString());
+    const body = req.body;
+    console.log('📱 Webhook Meta reçu:', JSON.stringify(body));
+    if (body.object === 'whatsapp_business_account') {
+      const entry = body.entry?.[0];
+      const change = entry?.changes?.[0];
+      const message = change?.value?.messages?.[0];
+      if (message && message.type === 'text') {
+        const phone = message.from;
+        const texte = message.text.body;
+        console.log('📱 Message reçu:', texte, 'de', phone);
+        const produits = parserCommande(texte);
+        const phone_id = change.value.metadata.phone_number_id;
+        const token = process.env.META_TOKEN;
+        let reponse = '';
+        if (produits.length > 0) {
+          const count = await pool.query('SELECT COUNT(*) FROM orders');
+          const ref = `CMD-${String(parseInt(count.rows[0].count) + 1).padStart(4, '0')}`;
+          reponse = `✅ *MarchandPro* — Commande reçue !\n\n`;
+          produits.forEach(p => { reponse += `• ${p.quantite} ${p.unite} de ${p.produit}\n`; });
+          reponse += `\n📋 Référence : ${ref}\n⏳ Confirmation sous peu. Merci ! 🙏`;
+          pool.query('INSERT INTO orders (customer_phone, items, status) VALUES ($1, $2, $3)', [phone, JSON.stringify(produits), 'nouveau']);
+          pool.query(`INSERT INTO clients (phone, total_orders) VALUES ($1, 1) ON CONFLICT (phone) DO UPDATE SET total_orders = clients.total_orders + 1`, [phone]);
+        } else {
+          reponse = `👋 Bienvenue sur *MarchandPro* !\n\nPour commander, écrivez :\n_"je veux 3 sacs de riz et 2 bidons d'huile"_\n\nNous traitons votre commande automatiquement. 📦`;
+        }
+        await fetch(`https://graph.facebook.com/v18.0/${phone_id}/messages`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messaging_product: 'whatsapp', to: phone, type: 'text', text: { body: reponse } })
+        });
+      }
     }
+    res.status(200).send('OK');
   } catch (err) {
     console.error('Webhook error:', err);
     res.status(500).send('Erreur serveur');
@@ -215,12 +236,6 @@ app.get('/dashboard', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/roi', authMiddleware, async (req, res) => {
-  const commandes = await pool.query("SELECT COUNT(*) FROM orders WHERE created_at > NOW() - INTERVAL '30 days'");
-  const revenus = await pool.query("SELECT COALESCE(SUM(total),0) as total FROM orders WHERE status='livré' AND created_at > NOW() - INTERVAL '30 days'");
-  res.json({ periode: '30 derniers jours', commandes: parseInt(commandes.rows[0].count), revenus_fcfa: parseFloat(revenus.rows[0].total), cout_abonnement: 10000, roi: `${Math.round((parseFloat(revenus.rows[0].total) / 10000) * 100)}%` });
-});
-
 app.get('/migrate', async (req, res) => {
   try {
     await pool.query(`ALTER TABLE orders ALTER COLUMN customer_phone TYPE VARCHAR(50)`);
@@ -231,22 +246,10 @@ app.get('/migrate', async (req, res) => {
   }
 });
 
-app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));app.get('/webhook/whatsapp', (req, res) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
-  if (mode === 'subscribe' && token === 'marchandpro2026') {
-    res.status(200).send(challenge);
-  } else {
-    res.status(403).send('Forbidden');
-  }
-});
+app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 app.get('/health', (req, res) => res.json({ status: 'ok', app: 'MarchandPro', version: '1.0.0' }));
 app.get('/', (req, res) => res.json({ message: 'Bienvenue sur MarchandPro API 🇸🇳', status: 'running' }));
 
-setInterval(() => {
-  fetch('https://marchandpro.onrender.com/health').catch(()=>{});
-}, 840000);
-
-initDB().then(() => {app.listen(process.env.PORT || 3000, () => console.log('🚀 MarchandPro démarré sur port ' + (process.env.PORT || 3000)));
+initDB().then(() => {
+  app.listen(process.env.PORT || 3000, () => console.log('🚀 MarchandPro démarré sur port ' + (process.env.PORT || 3000)));
 }).catch(err => console.error('Erreur démarrage:', err));
