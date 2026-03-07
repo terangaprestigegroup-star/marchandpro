@@ -154,13 +154,15 @@ function parserCommande(message) {
     const quantite = parseInt(match[1]);
     const unite = match[2];
     const motProduit = match[3].toLowerCase();
+    if (motProduit.length <= 1) continue; // ignorer les mots vides comme "d"
     const produitTrouve = CATALOGUE.find(p => p.mots.some(m => motProduit.includes(m)));
+    if (!produitTrouve) continue; // ignorer les produits non reconnus
     produits.push({
       quantite,
       unite,
-      produit: produitTrouve ? produitTrouve.nom : match[3],
-      prix_unitaire: produitTrouve ? produitTrouve.prix : 0,
-      total: produitTrouve ? produitTrouve.prix * quantite : 0
+      produit: produitTrouve.nom,
+      prix_unitaire: produitTrouve.prix,
+      total: produitTrouve.prix * quantite
     });
   }
   return produits;
@@ -410,7 +412,7 @@ app.put('/api/invoices/:id/pay', authMiddleware, async (req, res) => {
 app.get('/dashboard', async (req, res) => {
   try {
     const commandes = await pool.query('SELECT COUNT(*) FROM orders');
-    const revenus = await pool.query("SELECT COALESCE(SUM(total),0) as total FROM orders WHERE status='livré'");
+    const revenus = await pool.query("SELECT COALESCE(SUM(CAST(total AS NUMERIC)),0) as total FROM orders");
     const impayes = await pool.query('SELECT COUNT(*) FROM invoices WHERE paid=false');
     const clients = await pool.query('SELECT COUNT(*) FROM clients');
     const recentes = await pool.query('SELECT * FROM orders ORDER BY created_at DESC LIMIT 10');
