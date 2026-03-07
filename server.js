@@ -85,9 +85,10 @@ function formaterCatalogue() {
 
 function parserCommande(message) {
   const produits = [];
+  const messageNorm = message.replace(/[\u2019\u2018\u02BC\u0060]/g, "'");
   const regex = /(\d+)\s*(sacs?|bidons?|boites?|kg|litres?|unités?|cartons?|paquets?)\s+(?:d[e']?\s+)?(\w+)/gi;
   let match;
-  while ((match = regex.exec(message)) !== null) {
+  while ((match = regex.exec(messageNorm)) !== null) {
     const quantite = parseInt(match[1]);
     const unite = match[2];
     const motProduit = match[3].toLowerCase();
