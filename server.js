@@ -441,6 +441,91 @@ app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashb
 app.get('/health', (req, res) => res.json({ status: 'ok', app: 'MarchandPro', version: '2.0.0' }));
 app.get('/', (req, res) => res.json({ message: 'Bienvenue sur MarchandPro API 🇸🇳', version: '2.0.0', status: 'running' }));
 
+// ============================================
+// RELANCES AUTOMATIQUES
+// ============================================
+async function envoyerRelances() {
+  try {
+    console.log('🔔 Vérification des relances...');
+
+    // Clients inactifs depuis 7 jours
+    const result = await pool.query(`
+      SELECT DISTINCT customer_phone,
+        MAX(created_at) as derniere_commande,
+        COUNT(*) as nb_commandes,
+        SUM(CAST(total AS NUMERIC)) as total_achats
+      FROM orders
+      GROUP BY customer_phone
+      HAVING MAX(created_at) < NOW() - INTERVAL '7 days'
+    `);
+
+    console.log(`📊 ${result.rows.length} client(s) inactif(s) trouvé(s)`);
+
+    for (const client of result.rows) {
+      const phone = client.customer_phone;
+      const nbCommandes = parseInt(client.nb_commandes);
+      const totalAchats = parseInt(client.total_achats || 0);
+      const joursInactif = Math.floor((Date.now() - new Date(client.derniere_commande)) / (1000 * 60 * 60 * 24));
+
+      const message = `👋 Bonjour ! Ici *MarchandPro* 🇸🇳\n\n` +
+        `Vous nous manquez ! Votre dernière commande date de *${joursInactif} jours*.\n\n` +
+        `🎁 *Offre spéciale* pour vous :\n` +
+        `Commandez aujourd'hui et bénéficiez d'une remise *5%* sur toute commande de 10 unités ou plus !\n\n` +
+        `📦 Nos produits disponibles :\n` +
+        `• Riz brisé — 22 000 FCFA/sac\n` +
+        `• Huile végétale — 25 000 FCFA/bidon\n` +
+        `• Sucre — 30 000 FCFA/sac\n\n` +
+        `Répondez *catalogue* pour voir tous nos produits 🛒`;
+
+      const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+      const META_TOKEN = process.env.META_TOKEN;
+
+      await fetch(`https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${META_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to: phone,
+          type: 'text',
+          text: { body: message }
+        })
+      });
+
+      console.log(`✅ Relance envoyée à +${phone} (${joursInactif} jours inactif)`);
+
+      // Attendre 2 secondes entre chaque message
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
+    console.log('✅ Relances terminées');
+  } catch (err) {
+    console.error('❌ Erreur relances:', err.message);
+  }
+}
+
+// Route manuelle pour tester les relances
+app.get('/api/relances', async (req, res) => {
+  await envoyerRelances();
+  res.json({ ok: true, message: 'Relances envoyées !' });
+});
+
+// Lancer les relances tous les jours à 9h du matin
+function planifierRelances() {
+  const maintenant = new Date();
+  const prochaine9h = new Date();
+  prochaine9h.setHours(9, 0, 0, 0);
+  if (prochaine9h <= maintenant) prochaine9h.setDate(prochaine9h.getDate() + 1);
+  const delai = prochaine9h - maintenant;
+  console.log(`⏰ Prochaines relances dans ${Math.round(delai/1000/60)} minutes`);
+  setTimeout(() => {
+    envoyerRelances();
+    setInterval(envoyerRelances, 24 * 60 * 60 * 1000); // Toutes les 24h
+  }, delai);
+}
+
 initDB().then(() => {
-  app.listen(process.env.PORT || 3000, () => console.log('🚀 MarchandPro v2.0 démarré sur port ' + (process.env.PORT || 3000)));
+  app.listen(process.env.PORT || 3000, () => {
+    console.log('🚀 MarchandPro v2.0 démarré sur port ' + (process.env.PORT || 3000));
+    planifierRelances();
+  });
 }).catch(err => console.error('Erreur démarrage:', err));
