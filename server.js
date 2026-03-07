@@ -288,6 +288,22 @@ app.post('/webhook/whatsapp', async (req, res) => {
           const produits = parserCommande(texte);
           if (produits.length > 0) {
             const total = produits.reduce((sum, p) => sum + p.total, 0);
+            let totalApresRemise = total;
+            let remiseMsg = '';
+
+            // Calcul remise par produit
+            produits.forEach(p => {
+              if (p.quantite >= 10) {
+                const remise = Math.round(p.total * 0.05);
+                totalApresRemise -= remise;
+                remiseMsg += `🎁 Remise 5% sur ${p.produit} : -${remise.toLocaleString('fr-FR')} FCFA\n`;
+              } else if (p.quantite >= 5) {
+                const remise = Math.round(p.total * 0.03);
+                totalApresRemise -= remise;
+                remiseMsg += `🎁 Remise 3% sur ${p.produit} : -${remise.toLocaleString('fr-FR')} FCFA\n`;
+              }
+            });
+
             const count = await pool.query('SELECT COUNT(*) FROM orders');
             const ref = `CMD-${String(parseInt(count.rows[0].count) + 1).padStart(4, '0')}`;
 
@@ -297,7 +313,12 @@ app.post('/webhook/whatsapp', async (req, res) => {
               if (p.total > 0) reponse += ` — ${p.total.toLocaleString('fr-FR')} FCFA`;
               reponse += '\n';
             });
-            if (total > 0) reponse += `\n💰 *Total : ${total.toLocaleString('fr-FR')} FCFA*`;
+            if (remiseMsg) reponse += `\n${remiseMsg}`;
+            if (totalApresRemise !== total) {
+              reponse += `💰 *Total après remise : ${totalApresRemise.toLocaleString('fr-FR')} FCFA*`;
+            } else if (total > 0) {
+              reponse += `💰 *Total : ${total.toLocaleString('fr-FR')} FCFA*`;
+            }
             reponse += `\n📋 Référence : ${ref}\n⏳ Confirmation sous peu. Merci ! 🙏`;
 
             await pool.query('INSERT INTO orders (customer_phone, items, total, status) VALUES ($1, $2, $3, $4)',
