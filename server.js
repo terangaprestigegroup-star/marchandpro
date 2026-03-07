@@ -5,6 +5,51 @@ const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
+async function demanderGroq(messageClient, contexte) {
+  const GROQ_API_KEY = process.env.GROQ_API_KEY;
+  const systemPrompt = `Tu es l'assistant IA de MarchandPro, une plateforme de gestion de commandes pour commerçants sénégalais.
+Tu réponds UNIQUEMENT en français. Tu es chaleureux, professionnel et efficace.
+
+Catalogue disponible :
+- Riz brisé : 22 000 FCFA/sac 50kg
+- Huile végétale : 25 000 FCFA/bidon 20L
+- Sucre : 30 000 FCFA/sac 50kg
+- Farine : 20 000 FCFA/sac 50kg
+- Mil : 18 000 FCFA/sac 50kg
+- Tomate concentrée : 15 000 FCFA/carton
+- Savon : 12 000 FCFA/carton
+- Lait en poudre : 8 500 FCFA/boite 2.5kg
+
+Contexte client : ${contexte}
+
+Règles :
+- Si le client veut commander, confirme les articles et calcule le total en FCFA
+- Si le client demande le catalogue, liste les produits avec prix
+- Si le client demande ses commandes, dis-lui de taper "mes commandes"
+- Réponds toujours avec des emojis 🇸🇳
+- Maximum 3-4 lignes par réponse
+- Ne jamais inventer des prix ou produits hors catalogue`;
+
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${GROQ_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'llama3-8b-8192',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: messageClient }
+      ],
+      max_tokens: 300,
+      temperature: 0.7
+    })
+  });
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || null;
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -220,7 +265,7 @@ app.post('/webhook/whatsapp', async (req, res) => {
             `🛒 Pour commander, écrivez simplement ce que vous voulez :\n\n_Exemple : "je veux 3 sacs de riz et 2 bidons d'huile"_\n\nTapez *catalogue* pour voir tous nos produits et prix. 📦`
           );
         }
-        // Traitement commande
+        // Groq AI pour tout message non reconnu
         else {
           const produits = parserCommande(texte);
           if (produits.length > 0) {
@@ -244,8 +289,12 @@ app.post('/webhook/whatsapp', async (req, res) => {
 
             await envoyerWhatsApp(phone_id, phone, reponse);
           } else {
-            await envoyerWhatsApp(phone_id, phone,
-              `👋 Bienvenue sur *MarchandPro* ! 🇸🇳\n\nQue souhaitez-vous faire ?\n\n1️⃣ Tapez *catalogue* — voir nos produits\n2️⃣ Tapez *commander* — passer une commande\n3️⃣ Tapez *mes commandes* — voir vos commandes`
+            // Groq répond à tout message non reconnu
+            const historique = await pool.query('SELECT COUNT(*) FROM orders WHERE customer_phone=$1', [phone]);
+            const contexte = `Ce client a ${historique.rows[0].count} commandes passées.`;
+            const reponseIA = await demanderGroq(message.text.body, contexte);
+            await envoyerWhatsApp(phone_id, phone, reponseIA ||
+              `👋 Bienvenue sur *MarchandPro* ! 🇸🇳\n\n1️⃣ *catalogue* — voir nos produits\n2️⃣ *commander* — passer une commande\n3️⃣ *mes commandes* — voir vos commandes`
             );
           }
         }
