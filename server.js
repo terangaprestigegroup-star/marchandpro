@@ -220,8 +220,9 @@ app.post('/webhook/whatsapp', async (req, res) => {
         const texte = message.text.body.toLowerCase().trim();
         const phone_id = change.value.metadata.phone_number_id;
 
-        // Menu principal
-        if (['bonjour', 'salut', 'bonsoir', 'hello', 'allô', 'allo', 'menu', 'aide', 'help'].some(m => texte.includes(m))) {
+        // Menu principal — seulement si message très court (1-2 mots)
+        if (['menu', 'aide', 'help'].some(m => texte === m) || 
+            (['bonjour', 'salut', 'bonsoir', 'hello', 'allo', 'allô'].some(m => texte === m))) {
           await envoyerWhatsApp(phone_id, phone,
             `👋 Bienvenue sur *MarchandPro* ! 🇸🇳\n\nQue souhaitez-vous faire ?\n\n1️⃣ Tapez *catalogue* — voir nos produits\n2️⃣ Tapez *commander* — passer une commande\n3️⃣ Tapez *mes commandes* — voir vos commandes\n\nNous livrons rapidement ! 📦`
           );
