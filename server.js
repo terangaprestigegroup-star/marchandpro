@@ -231,7 +231,16 @@ app.get('/migrate', async (req, res) => {
   }
 });
 
-app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
+app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));app.get('/webhook/whatsapp', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  if (mode === 'subscribe' && token === 'marchandpro2026') {
+    res.status(200).send(challenge);
+  } else {
+    res.status(403).send('Forbidden');
+  }
+});
 app.get('/health', (req, res) => res.json({ status: 'ok', app: 'MarchandPro', version: '1.0.0' }));
 app.get('/', (req, res) => res.json({ message: 'Bienvenue sur MarchandPro API 🇸🇳', status: 'running' }));
 
