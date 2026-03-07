@@ -63,12 +63,42 @@ async function initDB() {
   console.log('✅ Base de données MarchandPro initialisée');
 }
 
+const CATALOGUE = [
+  { nom: 'Riz brisé', unite: 'sac 50kg', prix: 22000, mots: ['riz'] },
+  { nom: 'Huile végétale', unite: 'bidon 20L', prix: 25000, mots: ['huile'] },
+  { nom: 'Sucre', unite: 'sac 50kg', prix: 30000, mots: ['sucre'] },
+  { nom: 'Farine', unite: 'sac 50kg', prix: 20000, mots: ['farine'] },
+  { nom: 'Mil', unite: 'sac 50kg', prix: 18000, mots: ['mil'] },
+  { nom: 'Tomate concentrée', unite: 'carton', prix: 15000, mots: ['tomate'] },
+  { nom: 'Savon', unite: 'carton', prix: 12000, mots: ['savon'] },
+  { nom: 'Lait en poudre', unite: 'boite 2.5kg', prix: 8500, mots: ['lait'] },
+];
+
+function formaterCatalogue() {
+  let msg = '📦 *Catalogue MarchandPro* 🇸🇳\n\n';
+  CATALOGUE.forEach((p, i) => {
+    msg += `${i + 1}. *${p.nom}* — ${p.prix.toLocaleString('fr-FR')} FCFA/${p.unite}\n`;
+  });
+  msg += '\nPour commander, écrivez :\n_"je veux 3 sacs de riz et 2 bidons d\'huile"_';
+  return msg;
+}
+
 function parserCommande(message) {
   const produits = [];
   const regex = /(\d+)\s*(sacs?|bidons?|boites?|kg|litres?|unités?|cartons?|paquets?)\s+(?:de\s+)?(\w+)/gi;
   let match;
   while ((match = regex.exec(message)) !== null) {
-    produits.push({ quantite: parseInt(match[1]), unite: match[2], produit: match[3].toLowerCase() });
+    const quantite = parseInt(match[1]);
+    const unite = match[2];
+    const motProduit = match[3].toLowerCase();
+    const produitTrouve = CATALOGUE.find(p => p.mots.some(m => motProduit.includes(m)));
+    produits.push({
+      quantite,
+      unite,
+      produit: produitTrouve ? produitTrouve.nom : match[3],
+      prix_unitaire: produitTrouve ? produitTrouve.prix : 0,
+      total: produitTrouve ? produitTrouve.prix * quantite : 0
+    });
   }
   return produits;
 }
@@ -82,6 +112,15 @@ function authMiddleware(req, res, next) {
   } catch {
     res.status(401).json({ error: 'Token invalide' });
   }
+}
+
+async function envoyerWhatsApp(phone_id, to, message) {
+  const token = process.env.META_TOKEN;
+  await fetch(`https://graph.facebook.com/v18.0/${phone_id}/messages`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: message } })
+  });
 }
 
 app.post('/api/register', async (req, res) => {
@@ -126,35 +165,89 @@ app.get('/webhook/whatsapp', (req, res) => {
 app.post('/webhook/whatsapp', async (req, res) => {
   try {
     const body = req.body;
-    console.log('📱 Webhook Meta reçu:', JSON.stringify(body));
     if (body.object === 'whatsapp_business_account') {
       const entry = body.entry?.[0];
       const change = entry?.changes?.[0];
       const message = change?.value?.messages?.[0];
       if (message && message.type === 'text') {
         const phone = message.from;
-        const texte = message.text.body;
-        console.log('📱 Message reçu:', texte, 'de', phone);
-        const produits = parserCommande(texte);
+        const texte = message.text.body.toLowerCase().trim();
         const phone_id = change.value.metadata.phone_number_id;
-        const token = process.env.META_TOKEN;
-        let reponse = '';
-        if (produits.length > 0) {
-          const count = await pool.query('SELECT COUNT(*) FROM orders');
-          const ref = `CMD-${String(parseInt(count.rows[0].count) + 1).padStart(4, '0')}`;
-          reponse = `✅ *MarchandPro* — Commande reçue !\n\n`;
-          produits.forEach(p => { reponse += `• ${p.quantite} ${p.unite} de ${p.produit}\n`; });
-          reponse += `\n📋 Référence : ${ref}\n⏳ Confirmation sous peu. Merci ! 🙏`;
-          pool.query('INSERT INTO orders (customer_phone, items, status) VALUES ($1, $2, $3)', [phone, JSON.stringify(produits), 'nouveau']);
-          pool.query(`INSERT INTO clients (phone, total_orders) VALUES ($1, 1) ON CONFLICT (phone) DO UPDATE SET total_orders = clients.total_orders + 1`, [phone]);
-        } else {
-          reponse = `👋 Bienvenue sur *MarchandPro* !\n\nPour commander, écrivez :\n_"je veux 3 sacs de riz et 2 bidons d'huile"_\n\nNous traitons votre commande automatiquement. 📦`;
+
+        // Menu principal
+        if (['bonjour', 'salut', 'bonsoir', 'hello', 'allô', 'allo', 'menu', 'aide', 'help'].some(m => texte.includes(m))) {
+          await envoyerWhatsApp(phone_id, phone,
+            `👋 Bienvenue sur *MarchandPro* ! 🇸🇳\n\nQue souhaitez-vous faire ?\n\n1️⃣ Tapez *catalogue* — voir nos produits\n2️⃣ Tapez *commander* — passer une commande\n3️⃣ Tapez *mes commandes* — voir vos commandes\n\nNous livrons rapidement ! 📦`
+          );
         }
-        await fetch(`https://graph.facebook.com/v18.0/${phone_id}/messages`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messaging_product: 'whatsapp', to: phone, type: 'text', text: { body: reponse } })
-        });
+        // Catalogue
+        else if (texte.includes('catalogue') || texte.includes('produit') || texte === '1') {
+          await envoyerWhatsApp(phone_id, phone, formaterCatalogue());
+        }
+        // Mes commandes
+        else if ((texte.includes('commande') && texte.includes('mes')) || texte === '3') {
+          const result = await pool.query('SELECT * FROM orders WHERE customer_phone=$1 ORDER BY created_at DESC LIMIT 5', [phone]);
+          if (result.rows.length === 0) {
+            await envoyerWhatsApp(phone_id, phone, `📋 Vous n'avez pas encore de commandes.\n\nTapez *catalogue* pour voir nos produits ! 😊`);
+          } else {
+            let msg = `📋 *Vos dernières commandes :*\n\n`;
+            result.rows.forEach(o => {
+              const emoji = o.status === 'livré' ? '✅' : o.status === 'confirmé' ? '🔄' : '⏳';
+              msg += `${emoji} CMD-${String(o.id).padStart(4, '0')} — ${o.status.toUpperCase()}\n`;
+            });
+            msg += `\nPour suivre une commande, tapez son numéro. Ex: *CMD-0027*`;
+            await envoyerWhatsApp(phone_id, phone, msg);
+          }
+        }
+        // Suivi commande CMD-XXXX
+        else if (texte.match(/cmd-\d+/i)) {
+          const ref = texte.match(/cmd-(\d+)/i)[1];
+          const result = await pool.query('SELECT * FROM orders WHERE id=$1', [parseInt(ref)]);
+          if (result.rows[0]) {
+            const o = result.rows[0];
+            const emoji = o.status === 'livré' ? '✅' : o.status === 'confirmé' ? '🔄' : '⏳';
+            await envoyerWhatsApp(phone_id, phone,
+              `${emoji} *CMD-${String(o.id).padStart(4, '0')}*\n\nStatut : ${o.status.toUpperCase()}\nTotal : ${Number(o.total).toLocaleString('fr-FR')} FCFA\nDate : ${new Date(o.created_at).toLocaleDateString('fr-FR')}`
+            );
+          } else {
+            await envoyerWhatsApp(phone_id, phone, `❌ Commande introuvable. Vérifiez le numéro et réessayez.`);
+          }
+        }
+        // Commander
+        else if (texte.includes('commander') || texte === '2') {
+          await envoyerWhatsApp(phone_id, phone,
+            `🛒 Pour commander, écrivez simplement ce que vous voulez :\n\n_Exemple : "je veux 3 sacs de riz et 2 bidons d'huile"_\n\nTapez *catalogue* pour voir tous nos produits et prix. 📦`
+          );
+        }
+        // Traitement commande
+        else {
+          const produits = parserCommande(texte);
+          if (produits.length > 0) {
+            const total = produits.reduce((sum, p) => sum + p.total, 0);
+            const count = await pool.query('SELECT COUNT(*) FROM orders');
+            const ref = `CMD-${String(parseInt(count.rows[0].count) + 1).padStart(4, '0')}`;
+
+            let reponse = `✅ *MarchandPro* — Commande reçue !\n\n`;
+            produits.forEach(p => {
+              reponse += `• ${p.quantite} ${p.unite} de ${p.produit}`;
+              if (p.total > 0) reponse += ` — ${p.total.toLocaleString('fr-FR')} FCFA`;
+              reponse += '\n';
+            });
+            if (total > 0) reponse += `\n💰 *Total : ${total.toLocaleString('fr-FR')} FCFA*`;
+            reponse += `\n📋 Référence : ${ref}\n⏳ Confirmation sous peu. Merci ! 🙏`;
+
+            await pool.query('INSERT INTO orders (customer_phone, items, total, status) VALUES ($1, $2, $3, $4)',
+              [phone, JSON.stringify(produits), total, 'nouveau']);
+            await pool.query(`INSERT INTO clients (phone, total_orders, total_spent) VALUES ($1, 1, $2) ON CONFLICT (phone) DO UPDATE SET total_orders = clients.total_orders + 1, total_spent = clients.total_spent + $2`,
+              [phone, total]);
+
+            await envoyerWhatsApp(phone_id, phone, reponse);
+          } else {
+            await envoyerWhatsApp(phone_id, phone,
+              `👋 Bienvenue sur *MarchandPro* ! 🇸🇳\n\nQue souhaitez-vous faire ?\n\n1️⃣ Tapez *catalogue* — voir nos produits\n2️⃣ Tapez *commander* — passer une commande\n3️⃣ Tapez *mes commandes* — voir vos commandes`
+            );
+          }
+        }
       }
     }
     res.status(200).send('OK');
@@ -246,10 +339,11 @@ app.get('/migrate', async (req, res) => {
   }
 });
 
+app.get('/api/catalogue', (req, res) => res.json(CATALOGUE));
 app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
-app.get('/health', (req, res) => res.json({ status: 'ok', app: 'MarchandPro', version: '1.0.0' }));
-app.get('/', (req, res) => res.json({ message: 'Bienvenue sur MarchandPro API 🇸🇳', status: 'running' }));
+app.get('/health', (req, res) => res.json({ status: 'ok', app: 'MarchandPro', version: '2.0.0' }));
+app.get('/', (req, res) => res.json({ message: 'Bienvenue sur MarchandPro API 🇸🇳', version: '2.0.0', status: 'running' }));
 
 initDB().then(() => {
-  app.listen(process.env.PORT || 3000, () => console.log('🚀 MarchandPro démarré sur port ' + (process.env.PORT || 3000)));
+  app.listen(process.env.PORT || 3000, () => console.log('🚀 MarchandPro v2.0 démarré sur port ' + (process.env.PORT || 3000)));
 }).catch(err => console.error('Erreur démarrage:', err));
