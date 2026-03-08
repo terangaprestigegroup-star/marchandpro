@@ -472,7 +472,10 @@ footer strong { color: white; }
 <!-- NAV -->
 <nav>
   <div class="nav-logo">🛒 Marchand<span>Pro</span></div>
-  <a href="https://wa.me/221711288439" class="nav-cta">📱 Démo gratuite</a>
+  <div style="display:flex;gap:10px;align-items:center">
+    <a href="tel:+221711288439" class="nav-cta" style="background:transparent;border:1.5px solid rgba(255,255,255,0.3);color:white">📞 Appeler</a>
+    <a href="/inscription" class="nav-cta">📱 Démo gratuite</a>
+  </div>
 </nav>
 
 <!-- HERO -->
@@ -482,12 +485,12 @@ footer strong { color: white; }
     <h1>Transformez WhatsApp en<br><span>machine à commandes</span></h1>
     <p>MarchandPro gère vos commandes WhatsApp automatiquement — catalogue, prix, factures et relances. Zéro effort, plus de ventes.</p>
     <div class="hero-btns">
-      <a href="https://wa.me/221711288439?text=Bonjour%20je%20veux%20tester%20MarchandPro" class="btn-primary">📱 Tester gratuitement</a>
+      <a href="/inscription" class="btn-primary">🚀 Commencer gratuitement</a>
       <a href="#fonctionnalites" class="btn-secondary">Voir comment ça marche →</a>
     </div>
     <div class="hero-stats">
+      <div class="stat"><span class="stat-num" id="stat-grossistes">2</span><div class="stat-label">Grossistes actifs</div></div>
       <div class="stat"><span class="stat-num">24h/24</span><div class="stat-label">Bot actif</div></div>
-      <div class="stat"><span class="stat-num">5%</span><div class="stat-label">Remises auto</div></div>
       <div class="stat"><span class="stat-num">0</span><div class="stat-label">Technicien requis</div></div>
     </div>
   </div>
@@ -608,7 +611,7 @@ footer strong { color: white; }
           <li><span class="cross">✗</span> Paiements Wave/OM</li>
           <li><span class="cross">✗</span> Relances automatiques</li>
         </ul>
-        <a href="https://wa.me/221711288439" class="pricing-btn outline">Commencer gratuitement</a>
+        <a href="/inscription" class="pricing-btn outline">Commencer gratuitement</a>
       </div>
       <div class="pricing-card popular">
         <div class="popular-badge">⭐ Le plus populaire</div>
@@ -623,7 +626,7 @@ footer strong { color: white; }
           <li><span class="check">✓</span> Paiements Wave/OM</li>
           <li><span class="cross">✗</span> Relances automatiques</li>
         </ul>
-        <a href="https://wa.me/221711288439?text=Je%20veux%20souscrire%20au%20plan%20Starter" class="pricing-btn filled">Démarrer maintenant</a>
+        <a href="/inscription" class="pricing-btn filled">Démarrer maintenant</a>
       </div>
       <div class="pricing-card">
         <div class="pricing-name">Pro</div>
@@ -637,7 +640,7 @@ footer strong { color: white; }
           <li><span class="check">✓</span> Support prioritaire</li>
           <li><span class="check">✓</span> Formation incluse</li>
         </ul>
-        <a href="https://wa.me/221711288439?text=Je%20veux%20souscrire%20au%20plan%20Pro" class="pricing-btn outline">Choisir Pro</a>
+        <a href="/inscription" class="pricing-btn outline">Choisir Pro</a>
       </div>
     </div>
   </div>
@@ -691,8 +694,8 @@ footer strong { color: white; }
   <div class="container">
     <h2>Prêt à automatiser<br>votre business ?</h2>
     <p>Rejoignez les grossistes sénégalais qui ont digitalisé leurs commandes WhatsApp.</p>
-    <a href="https://wa.me/221711288439?text=Bonjour%20je%20veux%20tester%20MarchandPro" class="btn-cta-final">
-      📱 Démarrer gratuitement sur WhatsApp
+    <a href="/inscription" class="btn-cta-final">
+      🚀 Commencer gratuitement — Zéro carte bancaire
     </a>
   </div>
 </section>
@@ -700,12 +703,23 @@ footer strong { color: white; }
 <!-- FOOTER -->
 <footer>
   <p><strong>MarchandPro</strong> — La plateforme de commandes WhatsApp pour grossistes sénégalais 🇸🇳</p>
-  <p style="margin-top:8px">WhatsApp : +221 71 128 84 39 | Dakar, Sénégal</p>
+  <p style="margin-top:8px">WhatsApp : <a href="tel:+221711288439" style="color:white">+221 71 128 84 39</a> | Dakar, Sénégal</p>
   <p style="margin-top:8px;font-size:12px">© 2026 MarchandPro by Terangaprestige. Tous droits réservés.</p>
 </footer>
 
 <!-- WHATSAPP FLOAT -->
-<a href="https://wa.me/221711288439" class="wa-float" title="Contacter sur WhatsApp">📱</a>
+<a href="https://wa.me/221711288439" class="wa-float" title="Commander sur WhatsApp">💬</a>
+
+<script>
+// Compteur dynamique grossistes
+fetch('/api/merchants')
+  .then(r => r.json())
+  .then(data => {
+    const total = Array.isArray(data) ? data.length : (data.merchants?.length || 2);
+    const el = document.getElementById('stat-grossistes');
+    if (el) el.textContent = total;
+  }).catch(() => {});
+</script>
 
 </body>
 </html>
