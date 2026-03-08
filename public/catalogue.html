@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catalogue — MarchandPro</title>
+<title>Catalogue — Teranga Biz</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 <style>
 * { margin:0;padding:0;box-sizing:border-box; }
@@ -119,11 +119,12 @@ body { font-family:'DM Sans',sans-serif;background:var(--gris);color:var(--texte
 }
 .toast.show { opacity:1; }
 </style>
+<link rel="manifest" href="/manifest.json"><meta name="theme-color" content="#006633"><script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js")}</script>
 </head>
 <body>
 
 <div class="header">
-  <div class="header-logo">🛒 MarchandPro</div>
+  <div class="header-logo">🛒 Teranga Biz</div>
   <div class="header-nom" id="h-nom">Chargement...</div>
   <div class="header-ville" id="h-ville"></div>
   <div class="header-badge">📦 Catalogue digital</div>
@@ -153,13 +154,24 @@ body { font-family:'DM Sans',sans-serif;background:var(--gris);color:var(--texte
 <div class="toast" id="toast"></div>
 
 <script>
-const API = 'https://marchandpro-production-b529.up.railway.app';
+const API = 'https://teranga-biz-production-b529.up.railway.app';
 const merchantId = window.location.pathname.split('/').pop();
 
 const EMOJIS = {
-  'riz':'🌾','huile':'🫙','sucre':'🍬','farine':'🌾',
-  'mil':'🌿','tomate':'🍅','savon':'🧼','lait':'🥛',
+  'riz':'🌾','huile':'🫙','sucre':'🍚','farine':'🥖',
+  'mil':'🌾','tomate':'🥫','savon':'🧼','lait':'🥛',
   'default':'📦'
+};
+
+const IMAGES = {
+  'riz': '/images/riz.png',
+  'huile': '/images/huile.png',
+  'sucre': '/images/sucre.png',
+  'farine': '/images/farine.png',
+  'mil': '/images/mil.png',
+  'tomate': '/images/tomate.png',
+  'savon': '/images/savon.png',
+  'lait': '/images/lait.png',
 };
 
 function getEmoji(nom) {
@@ -168,6 +180,14 @@ function getEmoji(nom) {
     if (n.includes(k)) return v;
   }
   return EMOJIS.default;
+}
+
+function getImage(nom) {
+  const n = nom.toLowerCase();
+  for (const [k,v] of Object.entries(IMAGES)) {
+    if (n.includes(k)) return v;
+  }
+  return null;
 }
 
 let merchant = null;
@@ -196,7 +216,9 @@ function renderCatalogue(produits) {
   }
   document.getElementById('grid').innerHTML = produits.map(p => `
     <div class="produit-card" onclick="ajouterPanier('${p.nom}', ${p.prix}, '${p.unite}')">
-      <div class="produit-img">${getEmoji(p.nom)}</div>
+      <div class="produit-img">
+        ${(() => { const img = getImage(p.nom); return img ? `<img src="${img}" style="width:100%;height:120px;object-fit:cover;" onerror="this.parentNode.innerHTML='<span style=font-size:56px>${getEmoji(p.nom)}</span>'" />` : `<span style="font-size:56px">${getEmoji(p.nom)}</span>`; })()}
+      </div>
       <div class="produit-body">
         <div class="produit-nom">${p.nom}</div>
         <div class="produit-unite">${p.unite}</div>
