@@ -246,6 +246,20 @@ const SECTEURS = {
       { nom: 'Sole fraîche', unite: 'kg', prix: 5000, mots: ['sole'] },
       { nom: 'Mérou frais', unite: 'kg', prix: 4000, mots: ['merou'] },
     ]
+  },
+  cosmetiques: {
+    nom: 'Cosmétiques & Beauté',
+    emoji: '💄',
+    catalogue: [
+      { nom: 'Crème Khess Petch', unite: 'carton 24 tubes', prix: 36000, mots: ['khess','khesspetch','creme'] },
+      { nom: 'Savon Lux', unite: 'carton 72 savons', prix: 28000, mots: ['lux','savon'] },
+      { nom: 'Huile de coco', unite: 'carton 12 bouteilles', prix: 24000, mots: ['coco','huile'] },
+      { nom: 'Beurre de karité', unite: 'kg', prix: 5000, mots: ['karite','beurre'] },
+      { nom: 'Parfum oud arabique', unite: 'lot 12 flacons', prix: 60000, mots: ['oud','parfum','arabique'] },
+      { nom: 'Musc blanc', unite: 'lot 12 flacons', prix: 45000, mots: ['musc','blanc'] },
+      { nom: 'Henné naturel', unite: 'kg', prix: 8000, mots: ['henne'] },
+      { nom: 'Extensions cheveux', unite: 'lot 10 pièces', prix: 35000, mots: ['extension','cheveux','perruque'] },
+    ]
   }
 };
 
@@ -1371,11 +1385,13 @@ app.get('/boutique/:slug', async (req, res) => {
 
   const SECTEUR_COLORS = {
     alimentaire: '#006633', menagers: '#1565C0', poisson: '#00838F',
-    pharmacie: '#AD1457', quincaillerie: '#E65100', telephonie: '#4527A0', textile: '#558B2F'
+    pharmacie: '#AD1457', quincaillerie: '#E65100', telephonie: '#4527A0',
+    textile: '#558B2F', cosmetiques: '#880E4F'
   };
   const SECTEUR_EMOJIS = {
     alimentaire:'🌾', menagers:'🧴', poisson:'🐟',
-    pharmacie:'💊', quincaillerie:'🔧', telephonie:'📱', textile:'👗'
+    pharmacie:'💊', quincaillerie:'🔧', telephonie:'📱',
+    textile:'👗', cosmetiques:'💄'
   };
 
   const couleur = SECTEUR_COLORS[m.secteur] || '#006633';
@@ -1595,6 +1611,7 @@ input:focus, select:focus { border-color:#006633; }
     <button class="secteur-btn selected" onclick="selSecteur('alimentaire',this)"><span class="secteur-emoji">🌾</span>Alimentaire</button>
     <button class="secteur-btn" onclick="selSecteur('menagers',this)"><span class="secteur-emoji">🧴</span>Ménagers</button>
     <button class="secteur-btn" onclick="selSecteur('poisson',this)"><span class="secteur-emoji">🐟</span>Poisson & Marée</button>
+    <button class="secteur-btn" onclick="selSecteur('cosmetiques',this)"><span class="secteur-emoji">💄</span>Cosmétiques</button>
     <button class="secteur-btn" onclick="selSecteur('pharmacie',this)"><span class="secteur-emoji">💊</span>Pharmacie</button>
     <button class="secteur-btn" onclick="selSecteur('quincaillerie',this)"><span class="secteur-emoji">🔧</span>Quincaillerie</button>
     <button class="secteur-btn" onclick="selSecteur('telephonie',this)"><span class="secteur-emoji">📱</span>Téléphonie</button>
