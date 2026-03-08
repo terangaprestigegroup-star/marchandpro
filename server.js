@@ -1041,6 +1041,9 @@ app.put('/api/merchants/:id/toggle', async (req, res) => {
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
+// Catalogue Pro — page partageable par grossiste
+app.get('/catalogue/:id', (req, res) => res.sendFile(path.join(__dirname, 'public', 'catalogue.html')));
+
 // Page admin
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 async function envoyerRelances() {
