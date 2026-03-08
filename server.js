@@ -507,7 +507,8 @@ app.post('/api/paydunya/webhook', async (req, res) => {
 });
 app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 app.get('/health', (req, res) => res.json({ status: 'ok', app: 'MarchandPro', version: '2.0.0' }));
-app.get('/', (req, res) => res.json({ message: 'Bienvenue sur MarchandPro API 🇸🇳', version: '2.0.0', status: 'running' }));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'landing.html')));
+app.get('/api', (req, res) => res.json({ message: 'Bienvenue sur MarchandPro API 🇸🇳', version: '2.1.0', status: 'running' }));
 
 // ============================================
 // RELANCES AUTOMATIQUES
