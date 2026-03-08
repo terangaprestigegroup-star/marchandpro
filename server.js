@@ -98,6 +98,7 @@ async function initDB() {
     );
     CREATE TABLE IF NOT EXISTS orders (
       id SERIAL PRIMARY KEY,
+      merchant_id INTEGER DEFAULT 1,
       customer_phone VARCHAR(50),
       customer_name VARCHAR(100),
       items JSONB,
@@ -115,12 +116,28 @@ async function initDB() {
     );
     CREATE TABLE IF NOT EXISTS clients (
       id SERIAL PRIMARY KEY,
-      phone VARCHAR(50) UNIQUE,
+      merchant_id INTEGER DEFAULT 1,
+      phone VARCHAR(50),
       name VARCHAR(100),
       total_orders INTEGER DEFAULT 0,
       total_spent DECIMAL DEFAULT 0,
       created_at TIMESTAMP DEFAULT NOW()
     );
+    CREATE TABLE IF NOT EXISTS merchants (
+      id SERIAL PRIMARY KEY,
+      nom_boutique VARCHAR(100) NOT NULL,
+      proprietaire VARCHAR(100),
+      whatsapp VARCHAR(50) UNIQUE NOT NULL,
+      ville VARCHAR(50) DEFAULT 'Dakar',
+      plan VARCHAR(20) DEFAULT 'gratuit',
+      actif BOOLEAN DEFAULT true,
+      catalogue JSONB DEFAULT '[]',
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+    INSERT INTO merchants (id, nom_boutique, proprietaire, whatsapp, ville, plan, catalogue)
+    VALUES (1, 'MarchandPro Demo', 'Terangaprestige', '221711288439', 'Dakar', 'pro',
+      '[{"nom":"Riz brise","unite":"sac 50kg","prix":22000,"mots":["riz"]},{"nom":"Huile vegetale","unite":"bidon 20L","prix":25000,"mots":["huile"]},{"nom":"Sucre","unite":"sac 50kg","prix":30000,"mots":["sucre"]},{"nom":"Farine","unite":"sac 50kg","prix":20000,"mots":["farine"]},{"nom":"Mil","unite":"sac 50kg","prix":18000,"mots":["mil"]},{"nom":"Tomate concentree","unite":"carton","prix":15000,"mots":["tomate"]},{"nom":"Savon","unite":"carton","prix":12000,"mots":["savon"]},{"nom":"Lait en poudre","unite":"boite 2.5kg","prix":8500,"mots":["lait"]}]'::jsonb)
+    ON CONFLICT (id) DO NOTHING;
   `);
   console.log('✅ Base de données MarchandPro initialisée');
 }
@@ -227,6 +244,55 @@ app.get('/webhook/whatsapp', (req, res) => {
   }
 });
 
+// Mémoire temporaire: quel client appartient à quel merchant
+const clientMerchantMap = {};
+
+async function getMerchantByClient(phone) {
+  // 1. Vérifier en mémoire
+  if (clientMerchantMap[phone]) {
+    const m = await pool.query('SELECT * FROM merchants WHERE id=$1 AND actif=true', [clientMerchantMap[phone]]);
+    if (m.rows[0]) return m.rows[0];
+  }
+  // 2. Chercher la dernière commande du client
+  const lastOrder = await pool.query(
+    'SELECT merchant_id FROM orders WHERE customer_phone=$1 ORDER BY created_at DESC LIMIT 1', [phone]
+  );
+  if (lastOrder.rows[0]) {
+    const m = await pool.query('SELECT * FROM merchants WHERE id=$1 AND actif=true', [lastOrder.rows[0].merchant_id]);
+    if (m.rows[0]) { clientMerchantMap[phone] = m.rows[0].id; return m.rows[0]; }
+  }
+  // 3. Merchant par défaut (id=1)
+  const def = await pool.query('SELECT * FROM merchants WHERE id=1');
+  return def.rows[0];
+}
+
+function formaterCatalogueMerchant(merchant) {
+  const catalogue = merchant.catalogue || CATALOGUE;
+  let msg = `📦 *Catalogue ${merchant.nom_boutique}* 🇸🇳\n\n`;
+  catalogue.forEach((p, i) => {
+    msg += `${i+1}. *${p.nom}* — ${parseInt(p.prix).toLocaleString('fr-FR')} FCFA/${p.unite}\n`;
+  });
+  msg += '\nPour commander, écrivez :\n_"je veux 3 sacs de riz et 2 bidons d\'huile"_';
+  return msg;
+}
+
+function parserCommandeMerchant(message, catalogue) {
+  const produits = [];
+  const messageNorm = message.normalize('NFC').replace(/[''‛`´]/g, "'").replace(/d'(\w)/gi, 'de $1');
+  const regex = /(\d+)\s*(sacs?|bidons?|boites?|kg|litres?|unités?|cartons?|paquets?)\s+(?:de\s+)?(\w+)/gi;
+  let match;
+  while ((match = regex.exec(messageNorm)) !== null) {
+    const quantite = parseInt(match[1]);
+    const unite = match[2];
+    const motProduit = match[3].toLowerCase();
+    if (motProduit.length <= 1) continue;
+    const produitTrouve = catalogue.find(p => (p.mots||[]).some(m => motProduit.includes(m)));
+    if (!produitTrouve) continue;
+    produits.push({ quantite, unite, produit: produitTrouve.nom, prix_unitaire: produitTrouve.prix, total: produitTrouve.prix * quantite });
+  }
+  return produits;
+}
+
 app.post('/webhook/whatsapp', async (req, res) => {
   try {
     const body = req.body;
@@ -236,30 +302,65 @@ app.post('/webhook/whatsapp', async (req, res) => {
       const message = change?.value?.messages?.[0];
       if (message && message.type === 'text') {
         const phone = message.from;
-        const texte = message.text.body.toLowerCase().trim();
+        const texteOriginal = message.text.body.trim();
+        const texte = texteOriginal.toLowerCase();
         const phone_id = change.value.metadata.phone_number_id;
 
-        // Menu principal — seulement si message très court (1-2 mots)
-        if (['menu', 'aide', 'help'].some(m => texte === m) || 
-            (['bonjour', 'salut', 'bonsoir', 'hello', 'allo', 'allô'].some(m => texte === m))) {
+        // ============================================
+        // DÉTECTION MERCHANT VIA CODE (Option C)
+        // ============================================
+        // Si le message commence par un code merchant (ex: "AMADOU", "BOUTIQUE123")
+        const codeMatch = texteOriginal.match(/^([A-Z0-9]{3,20})\s*$/);
+        if (codeMatch) {
+          const code = codeMatch[1].toUpperCase();
+          // Chercher merchant par nom_boutique ou whatsapp contenant ce code
+          const merchantResult = await pool.query(
+            `SELECT * FROM merchants WHERE actif=true AND (
+              UPPER(REPLACE(nom_boutique,' ','')) LIKE $1 OR
+              UPPER(proprietaire) LIKE $1
+            ) LIMIT 1`,
+            [`%${code}%`]
+          );
+          if (merchantResult.rows[0]) {
+            const m = merchantResult.rows[0];
+            clientMerchantMap[phone] = m.id;
+            await envoyerWhatsApp(phone_id, phone,
+              `👋 Bienvenue chez *${m.nom_boutique}* ! 🇸🇳\n\n` +
+              `Je suis votre assistant de commande automatique.\n\n` +
+              `1️⃣ Tapez *catalogue* — voir les produits\n` +
+              `2️⃣ Tapez *commander* — passer une commande\n` +
+              `3️⃣ Tapez *mes commandes* — voir vos commandes\n\n` +
+              `Livraison rapide à ${m.ville} ! 📦`
+            );
+            return res.status(200).send('OK');
+          }
+        }
+
+        // Récupérer le merchant du client
+        const merchant = await getMerchantByClient(phone);
+        const catalogue = merchant.catalogue || CATALOGUE;
+
+        // Menu principal
+        if (['menu', 'aide', 'help'].includes(texte) ||
+            ['bonjour', 'salut', 'bonsoir', 'hello', 'allo', 'allô'].includes(texte)) {
           await envoyerWhatsApp(phone_id, phone,
-            `👋 Bienvenue sur *MarchandPro* ! 🇸🇳\n\nQue souhaitez-vous faire ?\n\n1️⃣ Tapez *catalogue* — voir nos produits\n2️⃣ Tapez *commander* — passer une commande\n3️⃣ Tapez *mes commandes* — voir vos commandes\n\nNous livrons rapidement ! 📦`
+            `👋 Bienvenue chez *${merchant.nom_boutique}* ! 🇸🇳\n\n1️⃣ Tapez *catalogue* — voir nos produits\n2️⃣ Tapez *commander* — passer une commande\n3️⃣ Tapez *mes commandes* — voir vos commandes\n\nNous livrons rapidement ! 📦`
           );
         }
         // Catalogue
         else if (texte.includes('catalogue') || texte.includes('produit') || texte === '1') {
-          await envoyerWhatsApp(phone_id, phone, formaterCatalogue());
+          await envoyerWhatsApp(phone_id, phone, formaterCatalogueMerchant(merchant));
         }
         // Mes commandes
         else if ((texte.includes('commande') && texte.includes('mes')) || texte === '3') {
-          const result = await pool.query('SELECT * FROM orders WHERE customer_phone=$1 ORDER BY created_at DESC LIMIT 5', [phone]);
+          const result = await pool.query('SELECT * FROM orders WHERE customer_phone=$1 AND merchant_id=$2 ORDER BY created_at DESC LIMIT 5', [phone, merchant.id]);
           if (result.rows.length === 0) {
             await envoyerWhatsApp(phone_id, phone, `📋 Vous n'avez pas encore de commandes.\n\nTapez *catalogue* pour voir nos produits ! 😊`);
           } else {
             let msg = `📋 *Vos dernières commandes :*\n\n`;
             result.rows.forEach(o => {
               const emoji = o.status === 'livré' ? '✅' : o.status === 'confirmé' ? '🔄' : '⏳';
-              msg += `${emoji} CMD-${String(o.id).padStart(4, '0')} — ${o.status.toUpperCase()}\n`;
+              msg += `${emoji} CMD-${String(o.id).padStart(4,'0')} — ${o.status.toUpperCase()}\n`;
             });
             msg += `\nPour suivre une commande, tapez son numéro. Ex: *CMD-0027*`;
             await envoyerWhatsApp(phone_id, phone, msg);
@@ -273,7 +374,7 @@ app.post('/webhook/whatsapp', async (req, res) => {
             const o = result.rows[0];
             const emoji = o.status === 'livré' ? '✅' : o.status === 'confirmé' ? '🔄' : '⏳';
             await envoyerWhatsApp(phone_id, phone,
-              `${emoji} *CMD-${String(o.id).padStart(4, '0')}*\n\nStatut : ${o.status.toUpperCase()}\nTotal : ${Number(o.total).toLocaleString('fr-FR')} FCFA\nDate : ${new Date(o.created_at).toLocaleDateString('fr-FR')}`
+              `${emoji} *CMD-${String(o.id).padStart(4,'0')}*\n\nStatut : ${o.status.toUpperCase()}\nTotal : ${Number(o.total).toLocaleString('fr-FR')} FCFA\nDate : ${new Date(o.created_at).toLocaleDateString('fr-FR')}`
             );
           } else {
             await envoyerWhatsApp(phone_id, phone, `❌ Commande introuvable. Vérifiez le numéro et réessayez.`);
@@ -285,15 +386,14 @@ app.post('/webhook/whatsapp', async (req, res) => {
             `🛒 Pour commander, écrivez simplement ce que vous voulez :\n\n_Exemple : "je veux 3 sacs de riz et 2 bidons d'huile"_\n\nTapez *catalogue* pour voir tous nos produits et prix. 📦`
           );
         }
-        // Groq AI pour tout message non reconnu
+        // Groq AI + Parser commande
         else {
-          const produits = parserCommande(texte);
+          const produits = parserCommandeMerchant(texte, catalogue);
           if (produits.length > 0) {
             const total = produits.reduce((sum, p) => sum + p.total, 0);
             let totalApresRemise = total;
             let remiseMsg = '';
 
-            // Calcul remise par produit
             produits.forEach(p => {
               if (p.quantite >= 10) {
                 const remise = Math.round(p.total * 0.05);
@@ -307,9 +407,9 @@ app.post('/webhook/whatsapp', async (req, res) => {
             });
 
             const count = await pool.query('SELECT COUNT(*) FROM orders');
-            const ref = `CMD-${String(parseInt(count.rows[0].count) + 1).padStart(4, '0')}`;
+            const ref = `CMD-${String(parseInt(count.rows[0].count) + 1).padStart(4,'0')}`;
 
-            let reponse = `✅ *MarchandPro* — Commande reçue !\n\n`;
+            let reponse = `✅ *${merchant.nom_boutique}* — Commande reçue !\n\n`;
             produits.forEach(p => {
               reponse += `• ${p.quantite} ${p.unite} de ${p.produit}`;
               if (p.total > 0) reponse += ` — ${p.total.toLocaleString('fr-FR')} FCFA`;
@@ -323,10 +423,11 @@ app.post('/webhook/whatsapp', async (req, res) => {
             }
             reponse += `\n📋 Référence : ${ref}\n⏳ Confirmation sous peu. Merci ! 🙏`;
 
-            await pool.query('INSERT INTO orders (customer_phone, items, total, status) VALUES ($1, $2, $3, $4)',
-              [phone, JSON.stringify(produits), totalApresRemise, 'nouveau']);
-            await pool.query(`INSERT INTO clients (phone, total_orders, total_spent) VALUES ($1, 1, $2) ON CONFLICT (phone) DO UPDATE SET total_orders = clients.total_orders + 1, total_spent = clients.total_spent + $2`,
-              [phone, totalApresRemise]);
+            await pool.query('INSERT INTO orders (merchant_id, customer_phone, items, total, status) VALUES ($1, $2, $3, $4, $5)',
+              [merchant.id, phone, JSON.stringify(produits), totalApresRemise, 'nouveau']);
+            await pool.query(`INSERT INTO clients (merchant_id, phone, total_orders, total_spent) VALUES ($1, $2, 1, $3)
+              ON CONFLICT DO NOTHING`,
+              [merchant.id, phone, totalApresRemise]);
 
             await envoyerWhatsApp(phone_id, phone, reponse);
 
@@ -378,17 +479,16 @@ app.post('/webhook/whatsapp', async (req, res) => {
             }
           } else {
             // Groq répond à tout message non reconnu
-            const historique = await pool.query('SELECT COUNT(*) FROM orders WHERE customer_phone=$1', [phone]);
-            const contexte = `Ce client a ${historique.rows[0].count} commandes passées.`;
+            const historique = await pool.query('SELECT COUNT(*) FROM orders WHERE customer_phone=$1 AND merchant_id=$2', [phone, merchant.id]);
+            const contexte = `Boutique: ${merchant.nom_boutique}. Ce client a ${historique.rows[0].count} commandes passées.`;
             let reponseIA = null;
             try {
               reponseIA = await demanderGroq(message.text.body, contexte);
-              console.log('Groq reponse v3:', reponseIA);
             } catch(err) {
               console.error('Groq erreur:', err.message);
             }
             await envoyerWhatsApp(phone_id, phone, reponseIA ||
-              `👋 Bienvenue sur *MarchandPro* ! 🇸🇳\n\n1️⃣ *catalogue* — voir nos produits\n2️⃣ *commander* — passer une commande\n3️⃣ *mes commandes* — voir vos commandes`
+              `👋 Bienvenue chez *${merchant.nom_boutique}* ! 🇸🇳\n\n1️⃣ *catalogue* — voir nos produits\n2️⃣ *commander* — passer une commande\n3️⃣ *mes commandes* — voir vos commandes`
             );
           }
         }
@@ -666,7 +766,261 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'landing.
 app.get('/api', (req, res) => res.json({ message: 'Bienvenue sur MarchandPro API 🇸🇳', version: '2.1.0', status: 'running' }));
 
 // ============================================
-// RELANCES AUTOMATIQUES
+// ONBOARDING MULTI-CLIENTS
+// ============================================
+
+// Inscription nouveau grossiste
+app.post('/api/merchants/register', async (req, res) => {
+  try {
+    const { nom_boutique, proprietaire, whatsapp, ville, produits } = req.body;
+    if (!nom_boutique || !whatsapp) return res.status(400).json({ error: 'Nom boutique et WhatsApp requis' });
+
+    // Nettoyer le numéro WhatsApp
+    const wa = whatsapp.replace(/\D/g, '');
+
+    // Catalogue personnalisé ou catalogue par défaut
+    const catalogue = produits && produits.length > 0 ? produits : CATALOGUE.map(p => ({
+      nom: p.nom, unite: p.unite, prix: p.prix, mots: p.mots
+    }));
+
+    const result = await pool.query(
+      `INSERT INTO merchants (nom_boutique, proprietaire, whatsapp, ville, plan, catalogue)
+       VALUES ($1,$2,$3,$4,'gratuit',$5) RETURNING *`,
+      [nom_boutique, proprietaire || '', wa, ville || 'Dakar', JSON.stringify(catalogue)]
+    );
+
+    const merchant = result.rows[0];
+    console.log(`✅ Nouveau grossiste inscrit: ${nom_boutique} (${wa})`);
+
+    // Envoyer message de bienvenue
+    const msgBienvenue = `🎉 Bienvenue sur *MarchandPro* !\n\n` +
+      `Bonjour *${proprietaire || nom_boutique}* 🇸🇳\n\n` +
+      `Votre boutique *${nom_boutique}* est maintenant active !\n\n` +
+      `📊 Votre dashboard : ${process.env.BASE_URL || 'https://marchandpro-production-b529.up.railway.app'}/merchant/${merchant.id}\n\n` +
+      `Vos clients peuvent maintenant commander via WhatsApp 📱\n` +
+      `Plan actuel : *Gratuit* (50 commandes/mois)\n\n` +
+      `Pour passer au plan Starter à 15 000 FCFA/mois, répondez *UPGRADE* 🚀`;
+
+    await envoyerWhatsApp(process.env.PHONE_NUMBER_ID, wa, msgBienvenue);
+
+    res.json({ ok: true, merchant_id: merchant.id, message: 'Inscription réussie !' });
+  } catch (err) {
+    if (err.message.includes('unique')) return res.status(400).json({ error: 'Ce numéro WhatsApp est déjà inscrit' });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Liste tous les grossistes (admin)
+app.get('/api/merchants', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT m.*, 
+        COUNT(o.id) as nb_commandes,
+        COALESCE(SUM(CAST(o.total AS NUMERIC)),0) as revenus
+      FROM merchants m
+      LEFT JOIN orders o ON o.merchant_id = m.id
+      GROUP BY m.id
+      ORDER BY m.created_at DESC
+    `);
+    res.json(result.rows);
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// Dashboard d'un grossiste spécifique
+app.get('/api/merchants/:id/dashboard', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const merchant = await pool.query('SELECT * FROM merchants WHERE id=$1', [id]);
+    if (!merchant.rows[0]) return res.status(404).json({ error: 'Grossiste introuvable' });
+
+    const commandes = await pool.query('SELECT COUNT(*) FROM orders WHERE merchant_id=$1', [id]);
+    const revenus = await pool.query('SELECT COALESCE(SUM(CAST(total AS NUMERIC)),0) as total FROM orders WHERE merchant_id=$1', [id]);
+    const clients = await pool.query('SELECT COUNT(DISTINCT customer_phone) FROM orders WHERE merchant_id=$1', [id]);
+    const recentes = await pool.query('SELECT * FROM orders WHERE merchant_id=$1 ORDER BY created_at DESC LIMIT 10', [id]);
+
+    res.json({
+      merchant: merchant.rows[0],
+      kpis: {
+        commandes: parseInt(commandes.rows[0].count),
+        revenus_fcfa: parseFloat(revenus.rows[0].total),
+        clients: parseInt(clients.rows[0].count)
+      },
+      commandes_recentes: recentes.rows
+    });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// Page dashboard d'un grossiste
+app.get('/merchant/:id', async (req, res) => {
+  const { id } = req.params;
+  const merchant = await pool.query('SELECT * FROM merchants WHERE id=$1', [id]).catch(() => null);
+  if (!merchant?.rows[0]) return res.status(404).send('Grossiste introuvable');
+  const m = merchant.rows[0];
+  res.send(`
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${m.nom_boutique} — MarchandPro</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin:0;padding:0;box-sizing:border-box; }
+body { font-family:'DM Sans',sans-serif;background:#f0f4f0;color:#1a2e1a;min-height:100vh; }
+.header { background:linear-gradient(135deg,#004d26,#006633);color:white;padding:24px;text-align:center; }
+.header h1 { font-size:22px;font-weight:700; }
+.header p { font-size:13px;opacity:0.8;margin-top:4px; }
+.plan { display:inline-block;background:rgba(255,215,0,0.2);color:#FFD700;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;margin-top:8px;text-transform:uppercase; }
+.container { max-width:700px;margin:0 auto;padding:20px; }
+.kpis { display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px; }
+.kpi { background:white;border-radius:12px;padding:16px;text-align:center;box-shadow:0 2px 12px rgba(0,102,51,0.08); }
+.kpi-num { font-size:24px;font-weight:700;color:#006633; }
+.kpi-label { font-size:12px;color:#5a7a5a;margin-top:4px; }
+.card { background:white;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,102,51,0.08); }
+.card-title { font-weight:700;font-size:15px;margin-bottom:14px;color:#1a2e1a; }
+table { width:100%;border-collapse:collapse;font-size:13px; }
+th { background:#f0f4f0;padding:8px;text-align:left;font-size:11px;text-transform:uppercase;color:#5a7a5a; }
+td { padding:10px 8px;border-bottom:1px solid #f5f5f5; }
+.badge { display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#fff9e6;color:#cc9900; }
+.footer { text-align:center;color:#5a7a5a;font-size:12px;padding:20px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🛒 ${m.nom_boutique}</h1>
+  <p>${m.ville} — ${m.proprietaire}</p>
+  <div class="plan">Plan ${m.plan}</div>
+</div>
+<div class="container">
+  <div class="kpis" id="kpis"><div style="grid-column:1/-1;text-align:center;padding:20px;color:#5a7a5a">Chargement...</div></div>
+  <div class="card">
+    <div class="card-title">📋 Commandes récentes</div>
+    <div id="commandes">Chargement...</div>
+  </div>
+</div>
+<div class="footer">MarchandPro 🇸🇳 — <a href="/" style="color:#006633">Accueil</a></div>
+<script>
+const API = 'https://marchandpro-production-b529.up.railway.app';
+fetch(API+'/api/merchants/${id}/dashboard').then(r=>r.json()).then(data=>{
+  const {kpis,commandes_recentes} = data;
+  document.getElementById('kpis').innerHTML = \`
+    <div class="kpi"><div class="kpi-num">\${kpis.commandes}</div><div class="kpi-label">Commandes</div></div>
+    <div class="kpi"><div class="kpi-num">\${(kpis.revenus_fcfa/1000).toFixed(0)}k</div><div class="kpi-label">FCFA revenus</div></div>
+    <div class="kpi"><div class="kpi-num">\${kpis.clients}</div><div class="kpi-label">Clients</div></div>
+  \`;
+  document.getElementById('commandes').innerHTML = commandes_recentes.length ? \`
+    <table>
+      <thead><tr><th>Réf.</th><th>Client</th><th>Total</th><th>Statut</th></tr></thead>
+      <tbody>\${commandes_recentes.map(c=>\`
+        <tr>
+          <td>CMD-\${String(c.id).padStart(4,'0')}</td>
+          <td>+\${c.customer_phone}</td>
+          <td>\${parseInt(c.total).toLocaleString('fr-FR')} FCFA</td>
+          <td><span class="badge">\${c.status}</span></td>
+        </tr>
+      \`).join('')}</tbody>
+    </table>
+  \` : '<div style="text-align:center;color:#5a7a5a;padding:20px">Aucune commande pour l instant</div>';
+}).catch(()=>{document.getElementById('kpis').innerHTML='<div style="grid-column:1/-1;color:red">Erreur chargement</div>';});
+</script>
+</body>
+</html>`);
+});
+
+// Formulaire d'inscription grossiste
+app.get('/inscription', (req, res) => {
+  res.send(`
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Inscription — MarchandPro</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin:0;padding:0;box-sizing:border-box; }
+body { font-family:'DM Sans',sans-serif;background:#f0f4f0;color:#1a2e1a;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px; }
+.card { background:white;border-radius:20px;padding:36px;max-width:480px;width:100%;box-shadow:0 8px 40px rgba(0,102,51,0.12); }
+.logo { text-align:center;margin-bottom:28px; }
+.logo h1 { font-size:24px;font-weight:700;color:#006633; }
+.logo p { font-size:14px;color:#5a7a5a;margin-top:4px; }
+label { display:block;font-size:13px;font-weight:600;color:#1a2e1a;margin-bottom:6px;margin-top:16px; }
+input, select { width:100%;padding:12px 16px;border:1.5px solid #dde8dd;border-radius:10px;font-size:14px;font-family:inherit;color:#1a2e1a;outline:none;transition:border 0.2s; }
+input:focus, select:focus { border-color:#006633; }
+.btn { width:100%;background:#006633;color:white;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;margin-top:24px;font-family:inherit;transition:all 0.2s; }
+.btn:hover { background:#004d26; }
+.success { background:#e8f5e9;color:#006633;border-radius:10px;padding:16px;text-align:center;margin-top:16px;font-weight:600;display:none; }
+.error { background:#fdecea;color:#c0392b;border-radius:10px;padding:16px;text-align:center;margin-top:16px;font-weight:600;display:none; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <h1>🛒 MarchandPro</h1>
+    <p>Inscrivez votre boutique — C'est gratuit !</p>
+  </div>
+  <label>Nom de votre boutique *</label>
+  <input id="nom_boutique" type="text" placeholder="Ex: Boutique Amadou, Grossiste Fatou..." />
+  <label>Votre nom *</label>
+  <input id="proprietaire" type="text" placeholder="Ex: Amadou Diallo" />
+  <label>Numéro WhatsApp *</label>
+  <input id="whatsapp" type="tel" placeholder="Ex: 221771234567" />
+  <label>Ville</label>
+  <select id="ville">
+    <option>Dakar</option>
+    <option>Thiès</option>
+    <option>Pikine</option>
+    <option>Guédiawaye</option>
+    <option>Rufisque</option>
+    <option>Saint-Louis</option>
+    <option>Ziguinchor</option>
+    <option>Autre</option>
+  </select>
+  <button class="btn" onclick="inscrire()">🚀 Créer mon espace gratuit</button>
+  <div class="success" id="success"></div>
+  <div class="error" id="error"></div>
+</div>
+<script>
+async function inscrire() {
+  const nom_boutique = document.getElementById('nom_boutique').value.trim();
+  const proprietaire = document.getElementById('proprietaire').value.trim();
+  const whatsapp = document.getElementById('whatsapp').value.trim();
+  const ville = document.getElementById('ville').value;
+  if (!nom_boutique || !whatsapp) { 
+    document.getElementById('error').style.display='block';
+    document.getElementById('error').textContent='Nom de boutique et WhatsApp sont obligatoires !';
+    return; 
+  }
+  document.querySelector('.btn').textContent = '⏳ Inscription en cours...';
+  document.querySelector('.btn').disabled = true;
+  try {
+    const res = await fetch('/api/merchants/register', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({nom_boutique,proprietaire,whatsapp,ville})
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById('success').style.display='block';
+      document.getElementById('success').innerHTML = '🎉 Inscription réussie !<br>Vous allez recevoir un message WhatsApp de bienvenue.<br><br><a href="/merchant/'+data.merchant_id+'" style="color:#006633;font-weight:700">👉 Accéder à mon dashboard</a>';
+      document.querySelector('.btn').style.display='none';
+    } else {
+      throw new Error(data.error);
+    }
+  } catch(err) {
+    document.getElementById('error').style.display='block';
+    document.getElementById('error').textContent = 'Erreur: ' + err.message;
+    document.querySelector('.btn').textContent='🚀 Créer mon espace gratuit';
+    document.querySelector('.btn').disabled=false;
+  }
+}
+</script>
+</body>
+</html>`);
+});
+
+// ============================================
+// WEBHOOK WHATSAPP — Détection multi-merchant
 // ============================================
 async function envoyerRelances() {
   try {
