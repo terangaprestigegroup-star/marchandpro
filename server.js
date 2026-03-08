@@ -132,8 +132,14 @@ async function initDB() {
       plan VARCHAR(20) DEFAULT 'gratuit',
       actif BOOLEAN DEFAULT true,
       catalogue JSONB DEFAULT '[]',
+      referral_code VARCHAR(20) UNIQUE,
+      referral_by INTEGER,
+      mois_offerts INTEGER DEFAULT 0,
       created_at TIMESTAMP DEFAULT NOW()
     );
+    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS referral_code VARCHAR(20);
+    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS referral_by INTEGER;
+    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS mois_offerts INTEGER DEFAULT 0;
     INSERT INTO merchants (id, nom_boutique, proprietaire, whatsapp, ville, plan, catalogue)
     VALUES (1, 'MarchandPro Demo', 'Terangaprestige', '221711288439', 'Dakar', 'pro',
       '[{"nom":"Riz brise","unite":"sac 50kg","prix":22000,"mots":["riz"]},{"nom":"Huile vegetale","unite":"bidon 20L","prix":25000,"mots":["huile"]},{"nom":"Sucre","unite":"sac 50kg","prix":30000,"mots":["sucre"]},{"nom":"Farine","unite":"sac 50kg","prix":20000,"mots":["farine"]},{"nom":"Mil","unite":"sac 50kg","prix":18000,"mots":["mil"]},{"nom":"Tomate concentree","unite":"carton","prix":15000,"mots":["tomate"]},{"nom":"Savon","unite":"carton","prix":12000,"mots":["savon"]},{"nom":"Lait en poudre","unite":"boite 2.5kg","prix":8500,"mots":["lait"]}]'::jsonb)
@@ -988,13 +994,19 @@ app.get('/api/facture/:id/pdf', async (req, res) => {
 });
 
 // ============================================
-// ONBOARDING MULTI-CLIENTS
+// ONBOARDING MULTI-CLIENTS + PARRAINAGE
 // ============================================
+
+function genererCodeParrainage(nom) {
+  const base = nom.toUpperCase().replace(/[^A-Z0-9]/g,'').substring(0,6);
+  const suffix = Math.random().toString(36).substring(2,5).toUpperCase();
+  return base + suffix;
+}
 
 // Inscription nouveau grossiste
 app.post('/api/merchants/register', async (req, res) => {
   try {
-    const { nom_boutique, proprietaire, whatsapp, ville, secteur, produits } = req.body;
+    const { nom_boutique, proprietaire, whatsapp, ville, secteur, produits, ref } = req.body;
     if (!nom_boutique || !whatsapp) return res.status(400).json({ error: 'Nom boutique et WhatsApp requis' });
 
     const wa = whatsapp.replace(/\D/g, '');
@@ -1002,33 +1014,84 @@ app.post('/api/merchants/register', async (req, res) => {
     const catalogue = produits && produits.length > 0 ? produits :
       (SECTEURS[secteurKey]?.catalogue || SECTEURS.alimentaire.catalogue);
 
+    // Code parrainage unique
+    let referralCode = genererCodeParrainage(nom_boutique);
+    // S'assurer qu'il est unique
+    const existing = await pool.query('SELECT id FROM merchants WHERE referral_code=$1', [referralCode]);
+    if (existing.rows[0]) referralCode = referralCode + Math.floor(Math.random()*9);
+
+    // Trouver le parrain
+    let referralBy = null;
+    let parrain = null;
+    if (ref) {
+      const parrainResult = await pool.query('SELECT * FROM merchants WHERE referral_code=$1', [ref.toUpperCase()]);
+      if (parrainResult.rows[0]) { parrain = parrainResult.rows[0]; referralBy = parrain.id; }
+    }
+
     const result = await pool.query(
-      `INSERT INTO merchants (nom_boutique, proprietaire, whatsapp, ville, plan, catalogue)
-       VALUES ($1,$2,$3,$4,'gratuit',$5) RETURNING *`,
-      [nom_boutique, proprietaire || '', wa, ville || 'Dakar', JSON.stringify(catalogue)]
+      `INSERT INTO merchants (nom_boutique, proprietaire, whatsapp, ville, plan, catalogue, referral_code, referral_by)
+       VALUES ($1,$2,$3,$4,'gratuit',$5,$6,$7) RETURNING *`,
+      [nom_boutique, proprietaire||'', wa, ville||'Dakar', JSON.stringify(catalogue), referralCode, referralBy]
     );
 
     const merchant = result.rows[0];
-    const secteurInfo = SECTEURS[secteurKey];
-    console.log(`✅ Nouveau grossiste inscrit: ${nom_boutique} (${wa}) — ${secteurInfo?.nom}`);
+    const BASE = 'https://marchandpro-production-b529.up.railway.app';
+    console.log(`✅ Nouveau grossiste: ${nom_boutique} (${wa}) — Code parrainage: ${referralCode}`);
 
-    const msgBienvenue = `🎉 Bienvenue sur *MarchandPro* !\n\n` +
-      `Bonjour *${proprietaire || nom_boutique}* 🇸🇳\n\n` +
-      `Votre boutique *${nom_boutique}* est maintenant active !\n` +
-      `Secteur : ${secteurInfo?.emoji} ${secteurInfo?.nom}\n\n` +
-      `📊 Votre dashboard : ${process.env.BASE_URL || 'https://marchandpro-production-b529.up.railway.app'}/merchant/${merchant.id}\n` +
-      `📦 Votre catalogue : ${process.env.BASE_URL || 'https://marchandpro-production-b529.up.railway.app'}/catalogue/${merchant.id}\n\n` +
-      `Partagez votre lien catalogue à vos clients 📱\n` +
-      `Plan actuel : *Gratuit* (50 commandes/mois)\n\n` +
-      `Pour passer au plan Starter à 15 000 FCFA/mois, répondez *UPGRADE* 🚀`;
+    // Message bienvenue avec lien parrainage
+    const msgBienvenue =
+      `🎉 Bienvenue sur *MarchandPro* ! 🇸🇳\n\n` +
+      `Bonjour *${proprietaire || nom_boutique}*\n\n` +
+      `✅ Votre boutique *${nom_boutique}* est active !\n\n` +
+      `📊 Dashboard : ${BASE}/merchant/${merchant.id}\n` +
+      `📦 Catalogue : ${BASE}/catalogue/${merchant.id}\n\n` +
+      `━━━━━━━━━━━━━━━━\n` +
+      `🤝 *Votre lien de parrainage :*\n` +
+      `${BASE}/inscription?ref=${referralCode}\n\n` +
+      `Partagez ce lien à vos collègues grossistes.\n` +
+      `Chaque inscription = *1 mois offert* pour vous ! 🎁\n` +
+      `━━━━━━━━━━━━━━━━\n\n` +
+      `Plan actuel : *Gratuit* — 50 commandes/mois\n` +
+      `Tapez *UPGRADE* pour passer au plan Pro 🚀`;
 
     await envoyerWhatsApp(process.env.PHONE_NUMBER_ID, wa, msgBienvenue);
 
-    res.json({ ok: true, merchant_id: merchant.id, message: 'Inscription réussie !' });
+    // Notifier et récompenser le parrain
+    if (parrain) {
+      await pool.query('UPDATE merchants SET mois_offerts = COALESCE(mois_offerts,0) + 1 WHERE id=$1', [parrain.id]);
+      const msgParrain =
+        `🎉 *Bonne nouvelle ${parrain.proprietaire || parrain.nom_boutique} !*\n\n` +
+        `*${nom_boutique}* vient de s'inscrire sur MarchandPro via votre lien ! 🙌\n\n` +
+        `🎁 *1 mois gratuit* a été ajouté à votre compte.\n\n` +
+        `Continuez à partager votre lien :\n` +
+        `${BASE}/inscription?ref=${parrain.referral_code}\n\n` +
+        `Merci de faire grandir MarchandPro ! 🇸🇳`;
+      await envoyerWhatsApp(process.env.PHONE_NUMBER_ID, parrain.whatsapp, msgParrain);
+    }
+
+    res.json({ ok: true, merchant_id: merchant.id, referral_code: referralCode, message: 'Inscription réussie !' });
   } catch (err) {
     if (err.message.includes('unique')) return res.status(400).json({ error: 'Ce numéro WhatsApp est déjà inscrit' });
     res.status(500).json({ error: err.message });
   }
+});
+
+// Stats parrainage d'un grossiste
+app.get('/api/merchants/:id/parrainage', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const merchant = await pool.query('SELECT * FROM merchants WHERE id=$1', [id]);
+    if (!merchant.rows[0]) return res.status(404).json({ error: 'Merchant introuvable' });
+    const m = merchant.rows[0];
+    const filleuls = await pool.query('SELECT nom_boutique, proprietaire, ville, created_at FROM merchants WHERE referral_by=$1 ORDER BY created_at DESC', [id]);
+    res.json({
+      ok: true,
+      referral_code: m.referral_code,
+      lien: `https://marchandpro-production-b529.up.railway.app/inscription?ref=${m.referral_code}`,
+      mois_offerts: m.mois_offerts || 0,
+      filleuls: filleuls.rows
+    });
+  } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
 // Liste tous les grossistes (admin)
@@ -1077,6 +1140,8 @@ app.get('/merchant/:id', async (req, res) => {
   const merchant = await pool.query('SELECT * FROM merchants WHERE id=$1', [id]).catch(() => null);
   if (!merchant?.rows[0]) return res.status(404).send('Grossiste introuvable');
   const m = merchant.rows[0];
+  const BASE = 'https://marchandpro-production-b529.up.railway.app';
+  const lienParrainage = m.referral_code ? `${BASE}/inscription?ref=${m.referral_code}` : null;
   res.send(`
 <!DOCTYPE html>
 <html lang="fr">
@@ -1103,6 +1168,11 @@ table { width:100%;border-collapse:collapse;font-size:13px; }
 th { background:#f0f4f0;padding:8px;text-align:left;font-size:11px;text-transform:uppercase;color:#5a7a5a; }
 td { padding:10px 8px;border-bottom:1px solid #f5f5f5; }
 .badge { display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:#fff9e6;color:#cc9900; }
+.referral-box { background:#e8f5e9;border:1.5px solid #006633;border-radius:14px;padding:20px;margin-bottom:16px; }
+.referral-title { font-weight:700;font-size:16px;color:#006633;margin-bottom:8px; }
+.referral-link { font-size:12px;color:#004d26;word-break:break-all;background:white;padding:10px;border-radius:8px;margin:10px 0; }
+.btn-copy { background:#006633;color:white;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;width:100%; }
+.mois-badge { display:inline-block;background:#FFD700;color:#1a2e1a;padding:4px 14px;border-radius:20px;font-size:13px;font-weight:700;margin-left:8px; }
 .footer { text-align:center;color:#5a7a5a;font-size:12px;padding:20px; }
 </style>
 </head>
@@ -1114,6 +1184,28 @@ td { padding:10px 8px;border-bottom:1px solid #f5f5f5; }
 </div>
 <div class="container">
   <div class="kpis" id="kpis"><div style="grid-column:1/-1;text-align:center;padding:20px;color:#5a7a5a">Chargement...</div></div>
+
+  ${lienParrainage ? `
+  <!-- PARRAINAGE -->
+  <div class="referral-box">
+    <div class="referral-title">🤝 Votre programme de parrainage
+      ${m.mois_offerts > 0 ? `<span class="mois-badge">🎁 ${m.mois_offerts} mois offert${m.mois_offerts>1?'s':''}</span>` : ''}
+    </div>
+    <p style="font-size:13px;color:#5a7a5a;margin-bottom:8px">Partagez ce lien à vos collègues grossistes. Chaque inscription = <b>1 mois gratuit</b> pour vous !</p>
+    <div class="referral-link">${lienParrainage}</div>
+    <button class="btn-copy" onclick="copierLien()">📋 Copier le lien de parrainage</button>
+    <div id="filleuls-section" style="margin-top:14px"></div>
+  </div>
+  ` : ''}
+
+  <div class="card">
+    <div class="card-title">📦 Liens rapides</div>
+    <div style="display:grid;gap:10px">
+      <a href="/catalogue/${id}" style="display:block;background:#e8f5e9;color:#006633;padding:12px 16px;border-radius:10px;font-weight:700;text-decoration:none">📦 Mon catalogue client</a>
+      <a href="/api/relances" style="display:block;background:#fff9e6;color:#cc9900;padding:12px 16px;border-radius:10px;font-weight:700;text-decoration:none">🔔 Envoyer relances</a>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-title">📋 Commandes récentes</div>
     <div id="commandes">Chargement...</div>
@@ -1122,6 +1214,15 @@ td { padding:10px 8px;border-bottom:1px solid #f5f5f5; }
 <div class="footer">MarchandPro 🇸🇳 — <a href="/" style="color:#006633">Accueil</a></div>
 <script>
 const API = 'https://marchandpro-production-b529.up.railway.app';
+
+function copierLien() {
+  navigator.clipboard.writeText('${lienParrainage}').then(() => {
+    const btn = document.querySelector('.btn-copy');
+    btn.textContent = '✅ Lien copié !';
+    setTimeout(() => btn.textContent = '📋 Copier le lien de parrainage', 2000);
+  });
+}
+
 fetch(API+'/api/merchants/${id}/dashboard').then(r=>r.json()).then(data=>{
   const {kpis,commandes_recentes} = data;
   document.getElementById('kpis').innerHTML = \`
@@ -1143,6 +1244,21 @@ fetch(API+'/api/merchants/${id}/dashboard').then(r=>r.json()).then(data=>{
     </table>
   \` : '<div style="text-align:center;color:#5a7a5a;padding:20px">Aucune commande pour l instant</div>';
 }).catch(()=>{document.getElementById('kpis').innerHTML='<div style="grid-column:1/-1;color:red">Erreur chargement</div>';});
+
+// Charger filleuls
+fetch(API+'/api/merchants/${id}/parrainage').then(r=>r.json()).then(data=>{
+  if(data.filleuls && data.filleuls.length > 0) {
+    document.getElementById('filleuls-section').innerHTML = \`
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px">👥 Vos filleuls (\${data.filleuls.length}) :</div>
+      \${data.filleuls.map(f=>\`
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid #e8f5e9;font-size:13px">
+          <span>🏪 \${f.nom_boutique}</span>
+          <span style="color:#5a7a5a">\${new Date(f.created_at).toLocaleDateString('fr-FR')}</span>
+        </div>
+      \`).join('')}
+    \`;
+  }
+}).catch(()=>{});
 </script>
 </body>
 </html>`);
@@ -1222,6 +1338,7 @@ async function inscrire() {
   const whatsapp = document.getElementById('whatsapp').value.trim();
   const ville = document.getElementById('ville').value;
   const secteur = document.getElementById('secteur').value;
+  const ref = new URLSearchParams(window.location.search).get('ref') || '';
   if (!nom_boutique || !whatsapp) {
     document.getElementById('error').style.display='block';
     document.getElementById('error').textContent='Nom de boutique et WhatsApp sont obligatoires !';
@@ -1232,14 +1349,22 @@ async function inscrire() {
   try {
     const res = await fetch('/api/merchants/register', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({nom_boutique,proprietaire,whatsapp,ville,secteur})
+      body:JSON.stringify({nom_boutique,proprietaire,whatsapp,ville,secteur,ref})
     });
     const data = await res.json();
     if (data.ok) {
+      const lienParrainage = `${window.location.origin}/inscription?ref=${data.referral_code}`;
       document.getElementById('success').style.display='block';
-      document.getElementById('success').innerHTML = '🎉 Inscription réussie !<br>Vous allez recevoir un message WhatsApp de bienvenue.<br><br>' +
+      document.getElementById('success').innerHTML =
+        '🎉 Inscription réussie !<br>Vous allez recevoir un message WhatsApp de bienvenue.<br><br>' +
         '<a href="/merchant/'+data.merchant_id+'" style="color:#006633;font-weight:700">👉 Mon dashboard</a> &nbsp;|&nbsp; ' +
-        '<a href="/catalogue/'+data.merchant_id+'" style="color:#006633;font-weight:700">📦 Mon catalogue</a>';
+        '<a href="/catalogue/'+data.merchant_id+'" style="color:#006633;font-weight:700">📦 Mon catalogue</a>' +
+        '<br><br><div style="background:#e8f5e9;padding:14px;border-radius:10px;margin-top:8px">' +
+        '🤝 <b>Votre lien de parrainage :</b><br>' +
+        '<span style="font-size:12px;word-break:break-all;color:#006633">' + lienParrainage + '</span><br>' +
+        '<button onclick="navigator.clipboard.writeText(\''+lienParrainage+'\').then(()=>alert(\'Lien copié !\'))" ' +
+        'style="margin-top:8px;background:#006633;color:white;border:none;padding:8px 16px;border-radius:8px;font-size:13px;cursor:pointer">📋 Copier le lien</button>' +
+        '</div>';
       document.querySelector('.btn').style.display='none';
     } else { throw new Error(data.error); }
   } catch(err) {
@@ -1249,6 +1374,17 @@ async function inscrire() {
     document.querySelector('.btn').disabled=false;
   }
 }
+
+// Afficher badge parrain si ref dans URL
+window.onload = function() {
+  const ref = new URLSearchParams(window.location.search).get('ref');
+  if (ref) {
+    const badge = document.createElement('div');
+    badge.style.cssText = 'background:#e8f5e9;border:1.5px solid #006633;color:#006633;padding:12px 16px;border-radius:10px;margin-bottom:20px;font-size:14px;font-weight:600;text-align:center';
+    badge.innerHTML = '🎁 Vous avez été invité(e) par un grossiste MarchandPro !<br><small style="font-weight:400">Inscrivez-vous et bénéficiez d\'un démarrage prioritaire.</small>';
+    document.querySelector('.card').insertBefore(badge, document.querySelector('.logo').nextSibling);
+  }
+};
 </script>
 </body>
 </html>`);
