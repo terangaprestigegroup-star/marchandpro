@@ -1079,14 +1079,16 @@ app.post('/api/merchants/register', async (req, res) => {
 // Générer codes parrainage manquants
 app.get('/api/admin/generer-codes', async (req, res) => {
   try {
-    const merchants = await pool.query('SELECT * FROM merchants WHERE referral_code IS NULL');
+    const merchants = await pool.query("SELECT * FROM merchants WHERE referral_code IS NULL OR referral_code = ''");
     let updated = 0;
     for (const m of merchants.rows) {
       const code = genererCodeParrainage(m.nom_boutique);
       await pool.query('UPDATE merchants SET referral_code=$1 WHERE id=$2', [code, m.id]);
       updated++;
     }
-    res.json({ ok: true, message: `${updated} codes générés !` });
+    // Retourner tous les codes actuels
+    const tous = await pool.query('SELECT id, nom_boutique, referral_code FROM merchants ORDER BY id');
+    res.json({ ok: true, message: `${updated} codes générés !`, merchants: tous.rows });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
