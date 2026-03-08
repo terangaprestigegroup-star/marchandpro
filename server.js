@@ -1023,9 +1023,26 @@ async function inscrire() {
 </html>`);
 });
 
-// ============================================
-// WEBHOOK WHATSAPP — Détection multi-merchant
-// ============================================
+// Changer le plan d'un merchant
+app.put('/api/merchants/:id/plan', async (req, res) => {
+  try {
+    const { plan } = req.body;
+    if (!['gratuit','starter','pro'].includes(plan)) return res.status(400).json({ error: 'Plan invalide' });
+    await pool.query('UPDATE merchants SET plan=$1 WHERE id=$2', [plan, req.params.id]);
+    res.json({ ok: true });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// Activer/désactiver un merchant
+app.put('/api/merchants/:id/toggle', async (req, res) => {
+  try {
+    await pool.query('UPDATE merchants SET actif = NOT actif WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+// Page admin
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 async function envoyerRelances() {
   try {
     console.log('🔔 Vérification des relances...');
