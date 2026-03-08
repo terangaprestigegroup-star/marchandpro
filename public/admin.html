@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — MarchandPro</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+* { margin:0;padding:0;box-sizing:border-box; }
+:root {
+  --vert:#006633;--vert-fonce:#004d26;--vert-clair:#e8f5e9;
+  --or:#FFD700;--or-fonce:#cc9900;
+  --rouge:#c0392b;--rouge-clair:#fdecea;
+  --bleu:#1a5fb4;--bleu-clair:#e3f0ff;
+  --gris:#f0f4f0;--blanc:#fff;--texte:#1a2e1a;--texte-light:#5a7a5a;
+}
+body { font-family:'DM Sans',sans-serif;background:var(--gris);color:var(--texte);min-height:100vh; }
+
+/* HEADER */
+.header {
+  background:linear-gradient(135deg,var(--vert-fonce),var(--vert));
+  color:white;padding:20px 28px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+  box-shadow:0 4px 20px rgba(0,77,38,0.3);
+}
+.header-logo { font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;display:flex;align-items:center;gap:8px; }
+.header-logo span { color:var(--or); }
+.header-right { display:flex;align-items:center;gap:16px;font-size:13px;opacity:0.85; }
+.header-badge { background:rgba(255,215,0,0.2);border:1px solid rgba(255,215,0,0.4);color:var(--or);padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700; }
+
+/* MAIN */
+.main { max-width:1100px;margin:0 auto;padding:28px 20px; }
+
+/* KPIs */
+.kpis { display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:28px; }
+.kpi {
+  background:var(--blanc);border-radius:16px;padding:20px 24px;
+  box-shadow:0 2px 16px rgba(0,102,51,0.08);
+  display:flex;align-items:center;gap:16px;
+}
+.kpi-icon { width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0; }
+.kpi-icon.vert { background:var(--vert-clair); }
+.kpi-icon.or { background:#fff9e6; }
+.kpi-icon.bleu { background:var(--bleu-clair); }
+.kpi-icon.rouge { background:var(--rouge-clair); }
+.kpi-num { font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;color:var(--texte);line-height:1; }
+.kpi-label { font-size:12px;color:var(--texte-light);margin-top:4px; }
+
+/* CARDS */
+.card { background:var(--blanc);border-radius:16px;padding:24px;box-shadow:0 2px 16px rgba(0,102,51,0.08);margin-bottom:24px; }
+.card-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px; }
+.card-title { font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700; }
+
+/* SEARCH */
+.search-bar {
+  padding:10px 16px;border:1.5px solid #dde8dd;border-radius:10px;
+  font-size:14px;font-family:inherit;color:var(--texte);outline:none;
+  width:280px;max-width:100%;
+}
+.search-bar:focus { border-color:var(--vert); }
+
+/* TABLE */
+.table-wrap { overflow-x:auto; }
+table { width:100%;border-collapse:collapse;font-size:13px; }
+th { background:var(--gris);padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--texte-light);font-weight:600;white-space:nowrap; }
+td { padding:14px;border-bottom:1px solid #f0f0f0;vertical-align:middle; }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:#fafcfa; }
+
+/* BADGES */
+.badge {
+  display:inline-flex;align-items:center;gap:4px;
+  padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;
+}
+.badge.gratuit { background:#f5f5f5;color:#666; }
+.badge.starter { background:var(--bleu-clair);color:var(--bleu); }
+.badge.pro { background:#fff9e6;color:var(--or-fonce); }
+.badge.actif { background:var(--vert-clair);color:var(--vert); }
+.badge.inactif { background:var(--rouge-clair);color:var(--rouge); }
+
+/* BUTTONS */
+.btn { padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:none;font-family:inherit;transition:all 0.2s;white-space:nowrap; }
+.btn-vert { background:var(--vert);color:white; }
+.btn-vert:hover { background:var(--vert-fonce); }
+.btn-or { background:var(--or);color:var(--vert-fonce); }
+.btn-or:hover { background:#ffe033; }
+.btn-rouge { background:var(--rouge-clair);color:var(--rouge);border:1px solid var(--rouge); }
+.btn-rouge:hover { background:var(--rouge);color:white; }
+.btn-outline { background:transparent;color:var(--vert);border:1.5px solid var(--vert); }
+.btn-outline:hover { background:var(--vert);color:white; }
+
+.btn-group { display:flex;gap:6px;flex-wrap:wrap; }
+
+/* MODAL */
+.modal-overlay {
+  position:fixed;inset:0;background:rgba(0,0,0,0.5);
+  display:flex;align-items:center;justify-content:center;
+  z-index:200;padding:20px;display:none;
+}
+.modal-overlay.open { display:flex; }
+.modal { background:white;border-radius:20px;padding:32px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.2); }
+.modal-title { font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;margin-bottom:20px; }
+.modal-field { margin-bottom:16px; }
+.modal-field label { display:block;font-size:13px;font-weight:600;margin-bottom:6px; }
+.modal-field input, .modal-field select {
+  width:100%;padding:10px 14px;border:1.5px solid #dde8dd;border-radius:10px;
+  font-size:14px;font-family:inherit;outline:none;
+}
+.modal-field input:focus, .modal-field select:focus { border-color:var(--vert); }
+.modal-btns { display:flex;gap:10px;margin-top:24px;justify-content:flex-end; }
+
+/* EMPTY */
+.empty { text-align:center;padding:40px;color:var(--texte-light);font-size:14px; }
+
+/* TOAST */
+.toast {
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:var(--vert-fonce);color:white;padding:12px 24px;border-radius:10px;
+  font-size:14px;font-weight:600;z-index:300;
+  opacity:0;transition:opacity 0.3s;pointer-events:none;
+}
+.toast.show { opacity:1; }
+
+/* LINK WA */
+.wa-link { font-size:11px;color:var(--vert);background:var(--vert-clair);padding:3px 8px;border-radius:6px;text-decoration:none;display:inline-block;margin-top:4px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">🛒 Marchand<span>Pro</span> — Admin</div>
+  <div class="header-right">
+    <div class="header-badge">👑 Super Admin</div>
+    <span id="last-update"></span>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- KPIs -->
+  <div class="kpis" id="kpis">
+    <div class="kpi"><div class="kpi-icon vert">🏪</div><div><div class="kpi-num" id="k-total">—</div><div class="kpi-label">Grossistes inscrits</div></div></div>
+    <div class="kpi"><div class="kpi-icon or">💰</div><div><div class="kpi-num" id="k-revenus">—</div><div class="kpi-label">Revenus totaux FCFA</div></div></div>
+    <div class="kpi"><div class="kpi-icon bleu">📋</div><div><div class="kpi-num" id="k-commandes">—</div><div class="kpi-label">Commandes totales</div></div></div>
+    <div class="kpi"><div class="kpi-icon rouge">⭐</div><div><div class="kpi-num" id="k-payants">—</div><div class="kpi-label">Clients payants</div></div></div>
+  </div>
+
+  <!-- TABLE MERCHANTS -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🏪 Grossistes inscrits</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <input class="search-bar" id="search" type="text" placeholder="🔍 Rechercher boutique, ville..." oninput="filtrer()" />
+        <button class="btn btn-vert" onclick="ouvrirModal()">+ Ajouter</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Boutique</th>
+            <th>Propriétaire</th>
+            <th>WhatsApp</th>
+            <th>Ville</th>
+            <th>Plan</th>
+            <th>Statut</th>
+            <th>Commandes</th>
+            <th>Revenus</th>
+            <th>Inscrit le</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="merchants-tbody">
+          <tr><td colspan="11" class="empty">Chargement...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL AJOUT/EDIT -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">➕ Ajouter un grossiste</div>
+    <input type="hidden" id="modal-id" />
+    <div class="modal-field">
+      <label>Nom de la boutique *</label>
+      <input id="m-nom" type="text" placeholder="Ex: Boutique Amadou" />
+    </div>
+    <div class="modal-field">
+      <label>Propriétaire</label>
+      <input id="m-proprio" type="text" placeholder="Ex: Amadou Diallo" />
+    </div>
+    <div class="modal-field">
+      <label>Numéro WhatsApp *</label>
+      <input id="m-wa" type="tel" placeholder="Ex: 221771234567" />
+    </div>
+    <div class="modal-field">
+      <label>Ville</label>
+      <select id="m-ville">
+        <option>Dakar</option><option>Thiès</option><option>Pikine</option>
+        <option>Guédiawaye</option><option>Rufisque</option><option>Saint-Louis</option>
+        <option>Ziguinchor</option><option>Autre</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Plan</label>
+      <select id="m-plan">
+        <option value="gratuit">Gratuit — 0 FCFA</option>
+        <option value="starter">Starter — 15 000 FCFA/mois</option>
+        <option value="pro">Pro — 35 000 FCFA/mois</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="fermerModal()">Annuler</button>
+      <button class="btn btn-vert" onclick="sauvegarder()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'https://marchandpro-production-b529.up.railway.app';
+let tousLesMarechants = [];
+
+function toast(msg, ok=true) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = ok ? '#004d26' : '#c0392b';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function formatFCFA(n) {
+  return parseInt(n||0).toLocaleString('fr-FR') + ' FCFA';
+}
+
+function formatDate(d) {
+  return new Date(d).toLocaleDateString('fr-FR', {day:'2-digit',month:'short',year:'numeric'});
+}
+
+function getPlanBadge(plan) {
+  const classes = {gratuit:'gratuit',starter:'starter',pro:'pro'};
+  const emojis = {gratuit:'⚪',starter:'🔵',pro:'⭐'};
+  return `<span class="badge ${classes[plan]||'gratuit'}">${emojis[plan]||''} ${plan}</span>`;
+}
+
+function getCodeWA(nom) {
+  return nom.toUpperCase().replace(/[^A-Z0-9]/g,'').substring(0,10);
+}
+
+async function charger() {
+  try {
+    const res = await fetch(`${API}/api/merchants`);
+    const data = await res.json();
+    tousLesMarechants = data;
+
+    // KPIs
+    const total = data.length;
+    const revenus = data.reduce((s,m) => s + parseFloat(m.revenus||0), 0);
+    const commandes = data.reduce((s,m) => s + parseInt(m.nb_commandes||0), 0);
+    const payants = data.filter(m => m.plan !== 'gratuit').length;
+
+    document.getElementById('k-total').textContent = total;
+    document.getElementById('k-revenus').textContent = (revenus/1000).toFixed(0)+'k';
+    document.getElementById('k-commandes').textContent = commandes;
+    document.getElementById('k-payants').textContent = payants;
+    document.getElementById('last-update').textContent = 'Mis à jour à ' + new Date().toLocaleTimeString('fr-FR');
+
+    afficherMerchants(data);
+  } catch(err) {
+    document.getElementById('merchants-tbody').innerHTML = `<tr><td colspan="11" class="empty">❌ Erreur: ${err.message}</td></tr>`;
+  }
+}
+
+function afficherMerchants(data) {
+  if (!data.length) {
+    document.getElementById('merchants-tbody').innerHTML = '<tr><td colspan="11" class="empty">Aucun grossiste inscrit</td></tr>';
+    return;
+  }
+  document.getElementById('merchants-tbody').innerHTML = data.map(m => `
+    <tr>
+      <td><b>#${m.id}</b></td>
+      <td>
+        <div style="font-weight:700">${m.nom_boutique}</div>
+        <a href="${API}/merchant/${m.id}" target="_blank" class="wa-link">👁️ Dashboard</a>
+      </td>
+      <td>${m.proprietaire||'—'}</td>
+      <td>
+        <div style="font-size:12px">+${m.whatsapp}</div>
+        <a href="https://wa.me/${m.whatsapp}?text=${getCodeWA(m.nom_boutique)}" target="_blank" class="wa-link">🔗 Lien client</a>
+      </td>
+      <td>${m.ville||'Dakar'}</td>
+      <td>${getPlanBadge(m.plan)}</td>
+      <td><span class="badge ${m.actif?'actif':'inactif'}">${m.actif?'✅ Actif':'❌ Inactif'}</span></td>
+      <td><b>${m.nb_commandes||0}</b></td>
+      <td style="font-weight:700;color:var(--vert)">${formatFCFA(m.revenus)}</td>
+      <td style="font-size:12px;color:var(--texte-light)">${formatDate(m.created_at)}</td>
+      <td>
+        <div class="btn-group">
+          <button class="btn btn-or" onclick="changerPlan(${m.id}, '${m.plan}', '${m.nom_boutique}')">⭐ Plan</button>
+          <button class="btn ${m.actif?'btn-rouge':'btn-vert'}" onclick="toggleActif(${m.id}, ${m.actif})">
+            ${m.actif?'⏸️ Suspendre':'▶️ Activer'}
+          </button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filtrer() {
+  const q = document.getElementById('search').value.toLowerCase();
+  if (!q) { afficherMerchants(tousLesMarechants); return; }
+  afficherMerchants(tousLesMarechants.filter(m =>
+    (m.nom_boutique||'').toLowerCase().includes(q) ||
+    (m.proprietaire||'').toLowerCase().includes(q) ||
+    (m.ville||'').toLowerCase().includes(q) ||
+    (m.plan||'').toLowerCase().includes(q) ||
+    (m.whatsapp||'').includes(q)
+  ));
+}
+
+async function changerPlan(id, planActuel, nom) {
+  const plans = ['gratuit','starter','pro'];
+  const labels = {'gratuit':'Gratuit — 0 FCFA','starter':'Starter — 15 000 FCFA/mois','pro':'Pro — 35 000 FCFA/mois'};
+  const nouveauPlan = prompt(`Plan actuel de ${nom}: ${planActuel}\n\nChoisir:\n- gratuit\n- starter\n- pro`);
+  if (!nouveauPlan || !plans.includes(nouveauPlan)) { toast('Plan invalide !', false); return; }
+  try {
+    const res = await fetch(`${API}/api/merchants/${id}/plan`, {
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({plan:nouveauPlan})
+    });
+    const data = await res.json();
+    if (data.ok) { toast(`✅ Plan changé vers ${nouveauPlan} !`); charger(); }
+    else toast('Erreur: ' + data.error, false);
+  } catch(err) { toast('Erreur serveur', false); }
+}
+
+async function toggleActif(id, actuel) {
+  try {
+    const res = await fetch(`${API}/api/merchants/${id}/toggle`, { method:'PUT' });
+    const data = await res.json();
+    if (data.ok) { toast(actuel ? '⏸️ Compte suspendu' : '✅ Compte activé'); charger(); }
+    else toast('Erreur: ' + data.error, false);
+  } catch(err) { toast('Erreur serveur', false); }
+}
+
+function ouvrirModal(merchant=null) {
+  document.getElementById('modal-id').value = merchant?.id || '';
+  document.getElementById('modal-title').textContent = merchant ? '✏️ Modifier grossiste' : '➕ Ajouter un grossiste';
+  document.getElementById('m-nom').value = merchant?.nom_boutique || '';
+  document.getElementById('m-proprio').value = merchant?.proprietaire || '';
+  document.getElementById('m-wa').value = merchant?.whatsapp || '';
+  document.getElementById('m-ville').value = merchant?.ville || 'Dakar';
+  document.getElementById('m-plan').value = merchant?.plan || 'gratuit';
+  document.getElementById('modal').classList.add('open');
+}
+
+function fermerModal() {
+  document.getElementById('modal').classList.remove('open');
+}
+
+async function sauvegarder() {
+  const nom = document.getElementById('m-nom').value.trim();
+  const wa = document.getElementById('m-wa').value.trim();
+  if (!nom || !wa) { toast('Nom et WhatsApp obligatoires !', false); return; }
+
+  try {
+    const res = await fetch(`${API}/api/merchants/register`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        nom_boutique: nom,
+        proprietaire: document.getElementById('m-proprio').value,
+        whatsapp: wa,
+        ville: document.getElementById('m-ville').value,
+        plan: document.getElementById('m-plan').value
+      })
+    });
+    const data = await res.json();
+    if (data.ok) { toast('✅ Grossiste ajouté !'); fermerModal(); charger(); }
+    else toast('Erreur: ' + data.error, false);
+  } catch(err) { toast('Erreur serveur', false); }
+}
+
+// Fermer modal en cliquant outside
+document.getElementById('modal').addEventListener('click', function(e) {
+  if (e.target === this) fermerModal();
+});
+
+charger();
+setInterval(charger, 30000);
+</script>
+</body>
+</html>
