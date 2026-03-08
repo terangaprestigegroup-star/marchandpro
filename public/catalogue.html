@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catalogue — MarchandPro</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<style>
+* { margin:0;padding:0;box-sizing:border-box; }
+:root {
+  --vert:#006633;--vert-fonce:#004d26;--vert-clair:#e8f5e9;
+  --or:#FFD700;--or-fonce:#cc9900;
+  --gris:#f5f7f5;--blanc:#fff;--texte:#1a2e1a;--texte-light:#5a7a5a;
+}
+body { font-family:'DM Sans',sans-serif;background:var(--gris);color:var(--texte);min-height:100vh; }
+
+/* HEADER */
+.header {
+  background:linear-gradient(135deg,var(--vert-fonce),var(--vert));
+  color:white;padding:28px 20px;text-align:center;
+  position:relative;overflow:hidden;
+}
+.header::before {
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 20% 50%,rgba(255,215,0,0.08),transparent 60%);
+}
+.header-logo { font-size:13px;opacity:0.7;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase; }
+.header-nom { font-family:'Playfair Display',serif;font-size:28px;font-weight:700;margin-bottom:6px; }
+.header-ville { font-size:14px;opacity:0.8; }
+.header-badge {
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(255,215,0,0.15);border:1px solid rgba(255,215,0,0.3);
+  color:var(--or);padding:5px 14px;border-radius:20px;
+  font-size:12px;font-weight:700;margin-top:12px;
+}
+
+/* SEARCH */
+.search-wrap { max-width:600px;margin:20px auto;padding:0 16px; }
+.search-input {
+  width:100%;padding:14px 20px;border-radius:50px;border:none;
+  font-size:15px;font-family:inherit;color:var(--texte);
+  box-shadow:0 4px 20px rgba(0,102,51,0.12);outline:none;
+}
+
+/* GRID */
+.catalogue-grid {
+  max-width:700px;margin:0 auto;
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+  gap:16px;padding:0 16px 100px;
+}
+
+/* PRODUCT CARD */
+.produit-card {
+  background:var(--blanc);border-radius:16px;
+  overflow:hidden;box-shadow:0 2px 16px rgba(0,102,51,0.08);
+  transition:transform 0.2s,box-shadow 0.2s;
+  cursor:pointer;
+}
+.produit-card:hover { transform:translateY(-4px);box-shadow:0 8px 32px rgba(0,102,51,0.15); }
+.produit-card:active { transform:scale(0.98); }
+
+.produit-img {
+  width:100%;height:120px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:56px;
+  background:linear-gradient(135deg,var(--vert-clair),#f0f8f0);
+}
+
+.produit-body { padding:12px; }
+.produit-nom { font-weight:700;font-size:14px;margin-bottom:4px;line-height:1.3; }
+.produit-unite { font-size:11px;color:var(--texte-light);margin-bottom:8px; }
+.produit-prix { font-size:16px;font-weight:700;color:var(--vert); }
+.produit-prix span { font-size:11px;font-weight:400;color:var(--texte-light); }
+
+.produit-remise {
+  display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;
+}
+.remise-badge {
+  font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;
+  background:#fff9e6;color:var(--or-fonce);
+}
+
+.btn-commander {
+  display:block;width:100%;margin-top:10px;
+  background:var(--vert);color:white;border:none;
+  padding:9px;border-radius:10px;font-size:13px;font-weight:700;
+  cursor:pointer;font-family:inherit;transition:background 0.2s;
+}
+.btn-commander:hover { background:var(--vert-fonce); }
+
+/* BOTTOM BAR */
+.bottom-bar {
+  position:fixed;bottom:0;left:0;right:0;
+  background:white;padding:12px 20px;
+  box-shadow:0 -4px 20px rgba(0,0,0,0.08);
+  display:flex;align-items:center;justify-content:space-between;
+  gap:12px;
+}
+.panier-info { font-size:13px;color:var(--texte-light); }
+.panier-info b { color:var(--texte);font-size:15px; }
+.btn-wa {
+  display:inline-flex;align-items:center;gap:8px;
+  background:#25D366;color:white;border:none;
+  padding:12px 20px;border-radius:12px;font-size:14px;font-weight:700;
+  cursor:pointer;font-family:inherit;text-decoration:none;
+  flex-shrink:0;
+}
+
+/* EMPTY */
+.empty { text-align:center;padding:60px 20px;color:var(--texte-light); }
+.empty-emoji { font-size:48px;margin-bottom:16px; }
+
+/* TOAST */
+.toast {
+  position:fixed;top:20px;left:50%;transform:translateX(-50%);
+  background:var(--vert-fonce);color:white;padding:10px 20px;border-radius:10px;
+  font-size:13px;font-weight:600;z-index:300;
+  opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap;
+}
+.toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">🛒 MarchandPro</div>
+  <div class="header-nom" id="h-nom">Chargement...</div>
+  <div class="header-ville" id="h-ville"></div>
+  <div class="header-badge">📦 Catalogue digital</div>
+</div>
+
+<div class="search-wrap">
+  <input class="search-input" id="search" type="text" placeholder="🔍 Rechercher un produit..." oninput="filtrer()" />
+</div>
+
+<div class="catalogue-grid" id="grid">
+  <div style="grid-column:1/-1" class="empty">
+    <div class="empty-emoji">⏳</div>
+    <div>Chargement du catalogue...</div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <div class="panier-info">
+    <div id="panier-label">Tapez un produit pour commander</div>
+    <div id="panier-total" style="color:var(--vert);font-weight:700;font-size:14px"></div>
+  </div>
+  <a id="btn-wa" href="#" class="btn-wa" target="_blank">
+    📱 Commander
+  </a>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'https://marchandpro-production-b529.up.railway.app';
+const merchantId = window.location.pathname.split('/').pop();
+
+const EMOJIS = {
+  'riz':'🌾','huile':'🫙','sucre':'🍬','farine':'🌾',
+  'mil':'🌿','tomate':'🍅','savon':'🧼','lait':'🥛',
+  'default':'📦'
+};
+
+function getEmoji(nom) {
+  const n = nom.toLowerCase();
+  for (const [k,v] of Object.entries(EMOJIS)) {
+    if (n.includes(k)) return v;
+  }
+  return EMOJIS.default;
+}
+
+let merchant = null;
+let catalogue = [];
+let panier = {};
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function formatPrix(p) {
+  return parseInt(p).toLocaleString('fr-FR');
+}
+
+function renderCatalogue(produits) {
+  if (!produits.length) {
+    document.getElementById('grid').innerHTML = `
+      <div style="grid-column:1/-1" class="empty">
+        <div class="empty-emoji">📦</div>
+        <div>Aucun produit trouvé</div>
+      </div>`;
+    return;
+  }
+  document.getElementById('grid').innerHTML = produits.map(p => `
+    <div class="produit-card" onclick="ajouterPanier('${p.nom}', ${p.prix}, '${p.unite}')">
+      <div class="produit-img">${getEmoji(p.nom)}</div>
+      <div class="produit-body">
+        <div class="produit-nom">${p.nom}</div>
+        <div class="produit-unite">${p.unite}</div>
+        <div class="produit-prix">${formatPrix(p.prix)} <span>FCFA</span></div>
+        <div class="produit-remise">
+          <span class="remise-badge">🎁 -3% dès 5</span>
+          <span class="remise-badge">🎁 -5% dès 10</span>
+        </div>
+        <button class="btn-commander">🛒 Ajouter</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function filtrer() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const filtered = q ? catalogue.filter(p => p.nom.toLowerCase().includes(q)) : catalogue;
+  renderCatalogue(filtered);
+}
+
+function ajouterPanier(nom, prix, unite) {
+  panier[nom] = (panier[nom] || { prix, unite, qte:0 });
+  panier[nom].qte++;
+  updatePanier();
+  toast(`✅ ${nom} ajouté !`);
+}
+
+function updatePanier() {
+  const items = Object.entries(panier).filter(([,v]) => v.qte > 0);
+  if (!items.length) {
+    document.getElementById('panier-label').textContent = 'Tapez un produit pour commander';
+    document.getElementById('panier-total').textContent = '';
+    document.getElementById('btn-wa').href = '#';
+    return;
+  }
+
+  let total = 0;
+  const lignes = items.map(([nom, v]) => {
+    let sous = v.prix * v.qte;
+    let remise = 0;
+    if (v.qte >= 10) remise = Math.round(sous * 0.05);
+    else if (v.qte >= 5) remise = Math.round(sous * 0.03);
+    total += sous - remise;
+    return `je veux ${v.qte} ${v.unite} de ${nom}`;
+  });
+
+  const totalItems = items.reduce((s,[,v]) => s + v.qte, 0);
+  document.getElementById('panier-label').textContent = `🛒 ${totalItems} article(s)`;
+  document.getElementById('panier-total').textContent = `Total estimé : ${total.toLocaleString('fr-FR')} FCFA`;
+
+  const waNum = merchant?.whatsapp || '221711288439';
+  const code = merchant?.nom_boutique?.toUpperCase().replace(/[^A-Z0-9]/g,'').substring(0,10) || '';
+  const msg = encodeURIComponent(lignes.join('\n'));
+  document.getElementById('btn-wa').href = `https://wa.me/${waNum}?text=${msg}`;
+}
+
+async function charger() {
+  try {
+    const res = await fetch(`${API}/api/merchants/${merchantId}/dashboard`);
+    const data = await res.json();
+    merchant = data.merchant;
+    catalogue = merchant.catalogue || [];
+
+    document.getElementById('h-nom').textContent = merchant.nom_boutique;
+    document.getElementById('h-ville').textContent = `📍 ${merchant.ville} · ${merchant.proprietaire}`;
+    document.title = `${merchant.nom_boutique} — Catalogue`;
+
+    renderCatalogue(catalogue);
+  } catch(err) {
+    document.getElementById('grid').innerHTML = `
+      <div style="grid-column:1/-1" class="empty">
+        <div class="empty-emoji">❌</div>
+        <div>Catalogue introuvable</div>
+      </div>`;
+  }
+}
+
+charger();
+</script>
+</body>
+</html>
