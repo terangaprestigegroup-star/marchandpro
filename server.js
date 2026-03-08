@@ -485,6 +485,140 @@ app.get('/migrate', async (req, res) => {
 
 app.get('/api/catalogue', (req, res) => res.json(CATALOGUE));
 
+// ============================================
+// GENERER LIEN PAYDUNYA
+// ============================================
+async function genererLienPaiement(ref, total, phone) {
+  try {
+    const paydunyaRes = await fetch('https://app.paydunya.com/sandbox-api/v1/checkout-invoice/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'PAYDUNYA-MASTER-KEY': process.env.PAYDUNYA_TOKEN,
+        'PAYDUNYA-PUBLIC-KEY': process.env.PAYDUNYA_PUBLIC_KEY,
+        'PAYDUNYA-PRIVATE-KEY': process.env.PAYDUNYA_PRIVATE_KEY,
+        'PAYDUNYA-MODE': 'test'
+      },
+      body: JSON.stringify({
+        invoice: {
+          total_amount: total,
+          description: `Commande ${ref} — MarchandPro`
+        },
+        store: {
+          name: 'MarchandPro',
+          tagline: 'Votre grossiste digital 🇸🇳',
+          phone: '+221711288439',
+          website_url: 'https://marchandpro-production-b529.up.railway.app'
+        },
+        actions: {
+          cancel_url: 'https://marchandpro-production-b529.up.railway.app',
+          return_url: 'https://marchandpro-production-b529.up.railway.app',
+          callback_url: 'https://marchandpro-production-b529.up.railway.app/api/paydunya/webhook'
+        },
+        custom_data: { ref, phone }
+      })
+    });
+    const data = await paydunyaRes.json();
+    console.log('PayDunya response:', JSON.stringify(data).substring(0, 300));
+    if (data.response_code === '00') return data.response_text;
+    return null;
+  } catch(err) {
+    console.error('PayDunya erreur:', err.message);
+    return null;
+  }
+}
+
+// ============================================
+// GENERER FACTURE HTML
+// ============================================
+function genererFactureHTML(commande) {
+  const ref = `CMD-${String(commande.id).padStart(4,'0')}`;
+  const date = new Date(commande.created_at).toLocaleDateString('fr-FR', {day:'2-digit', month:'long', year:'numeric'});
+  const items = commande.items || [];
+  const total = parseInt(commande.total || 0);
+
+  let lignes = items.filter(i => i.produit && i.produit.length > 1).map(i => `
+    <tr>
+      <td>${i.produit}</td>
+      <td style="text-align:center">${i.quantite} ${i.unite}</td>
+      <td style="text-align:right">${(i.prix_unitaire||0).toLocaleString('fr-FR')} FCFA</td>
+      <td style="text-align:right"><b>${(i.total||0).toLocaleString('fr-FR')} FCFA</b></td>
+    </tr>
+  `).join('');
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: Arial, sans-serif; padding: 40px; color: #1a2e1a; max-width: 700px; margin: 0 auto; }
+  .header { background: #006633; color: white; padding: 24px; border-radius: 12px; margin-bottom: 32px; display: flex; justify-content: space-between; align-items: center; }
+  .logo { font-size: 24px; font-weight: bold; }
+  .ref { font-size: 14px; opacity: 0.8; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+  .info-box { background: #f5f7f5; padding: 16px; border-radius: 8px; }
+  .info-label { font-size: 11px; color: #5a7a5a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .info-value { font-weight: bold; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  th { background: #006633; color: white; padding: 10px 12px; text-align: left; font-size: 12px; }
+  td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+  tr:hover td { background: #f5f7f5; }
+  .total-row { background: #e8f5e9; font-weight: bold; font-size: 15px; }
+  .total-row td { border: none; padding: 14px 12px; }
+  .footer { text-align: center; color: #5a7a5a; font-size: 12px; border-top: 2px solid #e8f5e9; padding-top: 16px; }
+  .badge { display: inline-block; background: #e8f5e9; color: #006633; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="logo">🛒 MarchandPro</div>
+      <div style="font-size:12px;opacity:0.7;margin-top:4px">Votre grossiste digital 🇸🇳</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:20px;font-weight:bold">${ref}</div>
+      <div class="ref">${date}</div>
+    </div>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-box">
+      <div class="info-label">Client</div>
+      <div class="info-value">+${commande.customer_phone}</div>
+    </div>
+    <div class="info-box">
+      <div class="info-label">Statut</div>
+      <div class="info-value"><span class="badge">${commande.status}</span></div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Produit</th>
+        <th style="text-align:center">Quantite</th>
+        <th style="text-align:right">Prix unitaire</th>
+        <th style="text-align:right">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${lignes}
+      <tr class="total-row">
+        <td colspan="3">TOTAL</td>
+        <td style="text-align:right">${total.toLocaleString('fr-FR')} FCFA</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <p><b>MarchandPro</b> — WhatsApp : +221 71 128 84 39 | Dakar, Senegal</p>
+    <p style="margin-top:4px">Merci pour votre confiance ! 🇸🇳</p>
+  </div>
+</body>
+</html>`;
+}
+
 // Webhook PayDunya — confirmation de paiement
 app.post('/api/paydunya/webhook', async (req, res) => {
   try {
@@ -502,6 +636,27 @@ app.post('/api/paydunya/webhook', async (req, res) => {
     res.status(200).json({ ok: true });
   } catch(err) {
     console.error('PayDunya webhook erreur:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+app.get('/api/test-paiement', async (req, res) => {
+  const lien = await genererLienPaiement('CMD-TEST', 5000, '221700000000');
+  if (lien) {
+    res.json({ ok: true, lien, message: 'Lien PayDunya généré avec succès !' });
+  } else {
+    res.json({ ok: false, message: 'Erreur PayDunya — vérifiez les clés API' });
+  }
+});
+
+// Route facture par commande
+app.get('/api/facture/:id', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM orders WHERE id=$1', [req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Commande introuvable' });
+    const html = genererFactureHTML(result.rows[0]);
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch(err) {
     res.status(500).json({ error: err.message });
   }
 });
