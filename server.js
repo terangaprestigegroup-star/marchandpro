@@ -344,6 +344,8 @@ app.get('/webhook/whatsapp', (req, res) => {
 
 // Mémoire temporaire: quel client appartient à quel merchant
 const clientMerchantMap = {};
+// Commandes en attente d'adresse de livraison
+const pendingAddress = {}; // phone -> { orderId, ref, total }
 
 async function getMerchantByClient(phone) {
   // 1. Vérifier en mémoire
@@ -602,6 +604,23 @@ app.post('/webhook/whatsapp', async (req, res) => {
         }
         // Groq AI + Parser commande
         else {
+
+          // Si client en attente d'adresse de livraison
+          if (pendingAddress[phone]) {
+            const { orderId, ref, total } = pendingAddress[phone];
+            const adresse = texte.trim();
+            // Sauvegarder adresse dans la commande
+            await pool.query("UPDATE orders SET items = items || jsonb_build_object('adresse_livraison', $1) WHERE id=$2", [adresse, orderId]);
+            delete pendingAddress[phone];
+            await envoyerWhatsApp(phone_id, phone,
+              `📍 *Adresse enregistrée !*\n\n` +
+              `Commande *${ref}* — *${total.toLocaleString('fr-FR')} FCFA*\n` +
+              `Livraison à : *${adresse}*\n\n` +
+              `✅ Votre commande est confirmée. Le grossiste vous contactera pour la livraison.\n\n` +
+              `_MarchandPro 🇸🇳_`
+            );
+            return res.sendStatus(200);
+          }
           const produits = parserCommandeMerchant(texte, catalogue);
           if (produits.length > 0) {
             const total = produits.reduce((sum, p) => sum + p.total, 0);
@@ -644,6 +663,17 @@ app.post('/webhook/whatsapp', async (req, res) => {
               [merchant.id, phone, totalApresRemise]);
 
             await envoyerWhatsApp(phone_id, phone, reponse);
+
+            // Demander adresse de livraison
+            const orderResult = await pool.query('SELECT id FROM orders WHERE customer_phone=$1 ORDER BY created_at DESC LIMIT 1', [phone]);
+            if (orderResult.rows[0]) {
+              pendingAddress[phone] = { orderId: orderResult.rows[0].id, ref, total: totalApresRemise };
+              setTimeout(async () => {
+                await envoyerWhatsApp(phone_id, phone,
+                  `📍 *Adresse de livraison*\n\nOù souhaitez-vous être livré ?\n\n_Exemple : "Quartier Médina, rue 12, près de la mosquée"_`
+                );
+              }, 2000);
+            }
 
             // Générer lien de paiement PayDunya si total > 0
             if (totalApresRemise > 0) {
@@ -920,6 +950,11 @@ function genererFactureHTML(commande) {
       <div class="info-label">Statut</div>
       <div class="info-value"><span class="badge">${commande.status}</span></div>
     </div>
+    ${items.adresse_livraison ? `
+    <div class="info-box" style="grid-column:1/-1">
+      <div class="info-label">📍 Adresse de livraison</div>
+      <div class="info-value">${items.adresse_livraison}</div>
+    </div>` : ''}
   </div>
 
   <table>
