@@ -218,6 +218,34 @@ const SECTEURS = {
       { nom: 'Robes femme', unite: 'lot 6 pièces', prix: 30000, mots: ['robe'] },
       { nom: 'Chaussures mixtes', unite: 'lot 6 paires', prix: 42000, mots: ['chaussure','chaussures'] },
     ]
+  },
+  menagers: {
+    nom: 'Produits Ménagers',
+    emoji: '🧴',
+    catalogue: [
+      { nom: 'Lessive Omo', unite: 'carton 12kg', prix: 18000, mots: ['omo','lessive'] },
+      { nom: 'Lessive Ariel', unite: 'carton 12kg', prix: 20000, mots: ['ariel'] },
+      { nom: 'Javel Canif', unite: 'carton 24 bouteilles', prix: 14000, mots: ['javel','canif'] },
+      { nom: 'Ajax poudre', unite: 'carton 12kg', prix: 16000, mots: ['ajax'] },
+      { nom: 'Savon Maquira', unite: 'carton 72 savons', prix: 22000, mots: ['maquira','savon'] },
+      { nom: 'Bougies', unite: 'carton 144 pièces', prix: 9000, mots: ['bougie','bougies'] },
+      { nom: 'Allumettes', unite: 'lot 100 boites', prix: 6000, mots: ['allumette','allumettes'] },
+      { nom: 'Papier hygiénique', unite: 'lot 48 rouleaux', prix: 12000, mots: ['papier','hygienique','wc'] },
+    ]
+  },
+  poisson: {
+    nom: 'Poisson & Marée',
+    emoji: '🐟',
+    catalogue: [
+      { nom: 'Thiof frais', unite: 'kg', prix: 4500, mots: ['thiof'] },
+      { nom: 'Capitaine frais', unite: 'kg', prix: 3500, mots: ['capitaine'] },
+      { nom: 'Sardine fraîche', unite: 'caisse 20kg', prix: 18000, mots: ['sardine'] },
+      { nom: 'Yeet (mollusque séché)', unite: 'kg', prix: 8000, mots: ['yeet'] },
+      { nom: 'Guedj (poisson séché)', unite: 'kg', prix: 6000, mots: ['guedj','guedje'] },
+      { nom: 'Crevettes fraîches', unite: 'kg', prix: 7000, mots: ['crevette','crevettes'] },
+      { nom: 'Sole fraîche', unite: 'kg', prix: 5000, mots: ['sole'] },
+      { nom: 'Mérou frais', unite: 'kg', prix: 4000, mots: ['merou'] },
+    ]
   }
 };
 
@@ -1321,6 +1349,8 @@ input:focus, select:focus { border-color:#006633; }
   <label>Votre secteur d'activité *</label>
   <div class="secteurs">
     <button class="secteur-btn selected" onclick="selSecteur('alimentaire',this)"><span class="secteur-emoji">🌾</span>Alimentaire</button>
+    <button class="secteur-btn" onclick="selSecteur('menagers',this)"><span class="secteur-emoji">🧴</span>Ménagers</button>
+    <button class="secteur-btn" onclick="selSecteur('poisson',this)"><span class="secteur-emoji">🐟</span>Poisson & Marée</button>
     <button class="secteur-btn" onclick="selSecteur('pharmacie',this)"><span class="secteur-emoji">💊</span>Pharmacie</button>
     <button class="secteur-btn" onclick="selSecteur('quincaillerie',this)"><span class="secteur-emoji">🔧</span>Quincaillerie</button>
     <button class="secteur-btn" onclick="selSecteur('telephonie',this)"><span class="secteur-emoji">📱</span>Téléphonie</button>
