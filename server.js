@@ -1493,6 +1493,9 @@ app.put('/api/merchants/:id/toggle', async (req, res) => {
 // Hub de navigation
 app.get('/hub', (req, res) => res.sendFile(path.join(__dirname, 'public', 'hub.html')));
 
+// Page QR codes
+app.get('/qr', (req, res) => res.sendFile(path.join(__dirname, 'public', 'qr.html')));
+
 // Catalogue Pro — page partageable par grossiste
 app.get('/catalogue/:id', (req, res) => res.sendFile(path.join(__dirname, 'public', 'catalogue.html')));
 
