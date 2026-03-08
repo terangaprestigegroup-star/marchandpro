@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QR Codes — MarchandPro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+* { margin:0;padding:0;box-sizing:border-box; }
+body { font-family:'Arial',sans-serif;background:#f0f4f0;padding:20px;color:#1a2e1a; }
+h1 { text-align:center;color:#006633;font-size:24px;margin-bottom:8px; }
+.subtitle { text-align:center;color:#5a7a5a;font-size:14px;margin-bottom:30px; }
+.grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;max-width:1000px;margin:0 auto; }
+
+/* AFFICHE IMPRIMABLE */
+.affiche {
+  background:white;
+  border-radius:20px;
+  overflow:hidden;
+  box-shadow:0 4px 24px rgba(0,102,51,0.12);
+  page-break-inside:avoid;
+}
+.affiche-header {
+  background:linear-gradient(135deg,#004d26,#006633);
+  color:white;
+  padding:24px;
+  text-align:center;
+}
+.affiche-logo { font-size:28px;font-weight:900;letter-spacing:-0.5px; }
+.affiche-tagline { font-size:12px;opacity:0.8;margin-top:4px; }
+.affiche-body { padding:28px;text-align:center; }
+.affiche-boutique { font-size:20px;font-weight:800;color:#1a2e1a;margin-bottom:4px; }
+.affiche-ville { font-size:13px;color:#5a7a5a;margin-bottom:20px; }
+.qr-container {
+  display:inline-block;
+  padding:16px;
+  background:white;
+  border:3px solid #006633;
+  border-radius:16px;
+  margin-bottom:20px;
+}
+.affiche-instruction {
+  font-size:15px;
+  font-weight:700;
+  color:#006633;
+  margin-bottom:8px;
+}
+.affiche-steps {
+  font-size:13px;
+  color:#5a7a5a;
+  line-height:1.8;
+  margin-bottom:20px;
+}
+.affiche-number {
+  background:#e8f5e9;
+  border:2px solid #006633;
+  border-radius:12px;
+  padding:12px 16px;
+  font-size:14px;
+  font-weight:700;
+  color:#006633;
+  margin-bottom:16px;
+}
+.affiche-footer {
+  background:#f5f7f5;
+  padding:12px;
+  text-align:center;
+  font-size:11px;
+  color:#5a7a5a;
+  border-top:1px solid #e8f5e9;
+}
+.plan-badge {
+  display:inline-block;
+  background:#FFD700;
+  color:#1a2e1a;
+  padding:3px 12px;
+  border-radius:20px;
+  font-size:11px;
+  font-weight:800;
+  margin-top:8px;
+  text-transform:uppercase;
+}
+.btn-print {
+  display:block;
+  width:100%;
+  max-width:400px;
+  margin:20px auto 0;
+  background:#006633;
+  color:white;
+  border:none;
+  padding:14px;
+  border-radius:12px;
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+  font-family:inherit;
+}
+.btn-print:hover { background:#004d26; }
+
+@media print {
+  body { background:white;padding:0; }
+  .affiche { box-shadow:none;border-radius:0;border:1px solid #ddd; }
+  .btn-print { display:none; }
+  .no-print { display:none; }
+  .grid { grid-template-columns:1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="no-print">
+  <h1>🛒 QR Codes MarchandPro</h1>
+  <p class="subtitle">Imprimez et collez ces affiches dans votre boutique</p>
+</div>
+
+<div class="grid" id="affiches"></div>
+
+<button class="btn-print no-print" onclick="window.print()">🖨️ Imprimer toutes les affiches</button>
+
+<script>
+const BASE = 'https://marchandpro-production-b529.up.railway.app';
+const WA_NUMBER = '221711288439';
+
+const MERCHANTS = [
+  {
+    id: 1,
+    nom: 'MarchandPro Demo',
+    proprietaire: 'Terangaprestige',
+    ville: 'Dakar',
+    plan: 'Pro',
+    message: 'Bonjour MarchandPro ! Je veux commander.'
+  },
+  {
+    id: 2,
+    nom: 'Boutique Amadou',
+    proprietaire: 'Amadou Diallo',
+    ville: 'Dakar',
+    plan: 'Starter',
+    message: 'Bonjour Boutique Amadou ! Je veux commander.'
+  }
+];
+
+function creerAffiche(merchant) {
+  const waLink = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(merchant.message)}`;
+  const catalogueLink = `${BASE}/catalogue/${merchant.id}`;
+
+  const div = document.createElement('div');
+  div.className = 'affiche';
+  div.innerHTML = `
+    <div class="affiche-header">
+      <div class="affiche-logo">🛒 MarchandPro</div>
+      <div class="affiche-tagline">Commandez via WhatsApp 24h/24 🇸🇳</div>
+    </div>
+    <div class="affiche-body">
+      <div class="affiche-boutique">${merchant.nom}</div>
+      <div class="affiche-ville">📍 ${merchant.ville} — ${merchant.proprietaire}</div>
+      
+      <div class="affiche-instruction">📱 Scannez pour commander</div>
+      <div id="qr-wa-${merchant.id}" class="qr-container"></div>
+      
+      <div class="affiche-steps">
+        1️⃣ Scannez le QR code<br>
+        2️⃣ WhatsApp s'ouvre automatiquement<br>
+        3️⃣ Envoyez votre commande<br>
+        4️⃣ Recevez la confirmation instantanément
+      </div>
+
+      <div class="affiche-number">
+        💬 Ou écrivez directement au :<br>
+        <span style="font-size:18px">+221 71 128 84 39</span>
+      </div>
+
+      <div style="font-size:13px;color:#5a7a5a;margin-bottom:12px">
+        📦 Voir le catalogue complet :<br>
+        <span style="color:#006633;font-weight:700">${catalogueLink}</span>
+      </div>
+      <div id="qr-cat-${merchant.id}" style="display:inline-block;padding:10px;border:2px solid #dde8dd;border-radius:12px;margin-bottom:12px"></div>
+      <br>
+      <span class="plan-badge">Plan ${merchant.plan}</span>
+    </div>
+    <div class="affiche-footer">
+      MarchandPro 🇸🇳 — La solution digitale pour les grossistes sénégalais<br>
+      ${BASE}
+    </div>
+  `;
+  return { div, waLink, catalogueLink, merchant };
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const container = document.getElementById('affiches');
+
+  MERCHANTS.forEach(merchant => {
+    const { div, waLink, catalogueLink } = creerAffiche(merchant);
+    container.appendChild(div);
+
+    // QR WhatsApp
+    new QRCode(document.getElementById(`qr-wa-${merchant.id}`), {
+      text: waLink,
+      width: 180,
+      height: 180,
+      colorDark: '#004d26',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.H
+    });
+
+    // QR Catalogue
+    new QRCode(document.getElementById(`qr-cat-${merchant.id}`), {
+      text: catalogueLink,
+      width: 100,
+      height: 100,
+      colorDark: '#006633',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  });
+});
+</script>
+</body>
+</html>
