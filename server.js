@@ -1466,16 +1466,18 @@ app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'adm
 async function envoyerRelances() {
   try {
     console.log('🔔 Vérification des relances impayés...');
-    const BASE = 'https://marchandpro-production-b529.up.railway.app';
 
-    // Commandes impayées (statut nouveau) groupées par client et merchant
+    // Commandes impayées avec total > 0, en nettoyant le préfixe whatsapp:
     const result = await pool.query(`
-      SELECT o.id, o.customer_phone, o.total, o.created_at, o.merchant_id,
-        m.nom_boutique, m.whatsapp as merchant_wa,
+      SELECT o.id, 
+        REPLACE(REPLACE(o.customer_phone, 'whatsapp:+', ''), 'whatsapp:', '') as customer_phone,
+        o.total, o.created_at, o.merchant_id,
+        m.nom_boutique,
         EXTRACT(EPOCH FROM (NOW() - o.created_at))/86400 as jours
       FROM orders o
       JOIN merchants m ON m.id = o.merchant_id
       WHERE o.status = 'nouveau'
+      AND CAST(o.total AS NUMERIC) > 0
       AND o.created_at < NOW() - INTERVAL '1 day'
       ORDER BY o.created_at ASC
     `);
@@ -1490,7 +1492,6 @@ async function envoyerRelances() {
       let message = '';
 
       if (jours >= 1 && jours < 3) {
-        // J+1 — Doux
         message =
           `👋 Bonjour !\n\n` +
           `Votre commande *${ref}* d'un montant de *${montant} FCFA* est en attente de paiement.\n\n` +
@@ -1498,7 +1499,6 @@ async function envoyerRelances() {
           `Une question ? Répondez à ce message.\n\n` +
           `_MarchandPro 🇸🇳_`;
       } else if (jours >= 3 && jours < 7) {
-        // J+3 — Ferme
         message =
           `🔔 *Rappel de paiement*\n\n` +
           `Commande *${ref}* — *${montant} FCFA*\n` +
@@ -1507,7 +1507,6 @@ async function envoyerRelances() {
           `Contactez-nous : +221 71 128 84 39\n\n` +
           `_MarchandPro 🇸🇳_`;
       } else if (jours >= 7) {
-        // J+7 — Urgent
         message =
           `⚠️ *Dernier rappel — ${ref}*\n\n` +
           `Montant dû : *${montant} FCFA*\n` +
@@ -1525,11 +1524,11 @@ async function envoyerRelances() {
       }
     }
 
-    // Relances clients inactifs (pas de commande depuis 7 jours)
+    // Clients inactifs depuis 7 à 30 jours
     const inactifs = await pool.query(`
-      SELECT DISTINCT customer_phone,
-        MAX(created_at) as derniere_commande,
-        COUNT(*) as nb_commandes
+      SELECT DISTINCT
+        REPLACE(REPLACE(customer_phone, 'whatsapp:+', ''), 'whatsapp:', '') as customer_phone,
+        MAX(created_at) as derniere_commande
       FROM orders
       GROUP BY customer_phone
       HAVING MAX(created_at) < NOW() - INTERVAL '7 days'
@@ -1560,7 +1559,7 @@ async function envoyerRelances() {
   }
 }
 
-// Route manuelle pour tester les relances
+// Route manuelle pour déclencher les relances
 app.get('/api/relances', async (req, res) => {
   const envoyes = await envoyerRelances();
   res.json({ ok: true, message: `${envoyes} relance(s) envoyée(s) !` });
@@ -1576,7 +1575,7 @@ function planifierRelances() {
   console.log(`⏰ Prochaines relances dans ${Math.round(delai/1000/60)} minutes`);
   setTimeout(() => {
     envoyerRelances();
-    setInterval(envoyerRelances, 24 * 60 * 60 * 1000); // Toutes les 24h
+    setInterval(envoyerRelances, 24 * 60 * 60 * 1000);
   }, delai);
 }
 
