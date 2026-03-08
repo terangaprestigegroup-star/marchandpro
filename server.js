@@ -342,17 +342,54 @@ function formaterCatalogueMerchant(merchant) {
 
 function parserCommandeMerchant(message, catalogue) {
   const produits = [];
-  const messageNorm = message.normalize('NFC').replace(/[''‛`´]/g, "'").replace(/d'(\w)/gi, 'de $1');
-  const regex = /(\d+)\s*(sacs?|bidons?|boites?|kg|litres?|unités?|cartons?|paquets?)\s+(?:de\s+)?(\w+)/gi;
+  const messageNorm = message
+    .normalize('NFC')
+    .replace(/[''‛`´]/g, "'")
+    .replace(/d'(\w)/gi, 'de $1')
+    .replace(/l'(\w)/gi, 'le $1');
+
+  // Pattern 1 : "3 sacs de riz", "2 bidons d'huile"
+  const regex1 = /(\d+)\s*(sacs?|bidons?|boites?|kg|litres?|unités?|cartons?|paquets?|barre?s?)\s+(?:de\s+)?(\w+)/gi;
+  // Pattern 2 : "riz 3 sacs", "huile 2 bidons"  
+  const regex2 = /(\w+)\s+(\d+)\s*(sacs?|bidons?|boites?|cartons?|paquets?)/gi;
+  // Pattern 3 : juste "3 riz", "2 huile" (quantité + nom produit)
+  const regex3 = /(\d+)\s+(\w{3,})/gi;
+
+  const ajouter = (quantite, unite, motProduit) => {
+    if (motProduit.length <= 1) return;
+    const motNorm = motProduit.toLowerCase()
+      .replace(/é/g,'e').replace(/è/g,'e').replace(/ê/g,'e')
+      .replace(/â/g,'a').replace(/û/g,'u');
+    const produitTrouve = catalogue.find(p =>
+      (p.mots || []).some(m => motNorm.includes(m) || m.includes(motNorm))
+    );
+    if (!produitTrouve) return;
+    // Éviter les doublons
+    if (produits.find(p => p.produit === produitTrouve.nom)) return;
+    produits.push({
+      quantite,
+      unite: unite || produitTrouve.unite,
+      produit: produitTrouve.nom,
+      prix_unitaire: produitTrouve.prix,
+      total: produitTrouve.prix * quantite
+    });
+  };
+
   let match;
-  while ((match = regex.exec(messageNorm)) !== null) {
-    const quantite = parseInt(match[1]);
-    const unite = match[2];
-    const motProduit = match[3].toLowerCase();
-    if (motProduit.length <= 1) continue;
-    const produitTrouve = catalogue.find(p => (p.mots||[]).some(m => motProduit.includes(m)));
-    if (!produitTrouve) continue;
-    produits.push({ quantite, unite, produit: produitTrouve.nom, prix_unitaire: produitTrouve.prix, total: produitTrouve.prix * quantite });
+  while ((match = regex1.exec(messageNorm)) !== null) {
+    ajouter(parseInt(match[1]), match[2], match[3]);
+  }
+  if (produits.length === 0) {
+    while ((match = regex2.exec(messageNorm)) !== null) {
+      ajouter(parseInt(match[2]), match[3], match[1]);
+    }
+  }
+  if (produits.length === 0) {
+    while ((match = regex3.exec(messageNorm)) !== null) {
+      const mot = match[2].toLowerCase();
+      if (['veux','vois','sacs','sac','des','les','une','pour','avec'].includes(mot)) continue;
+      ajouter(parseInt(match[1]), null, mot);
+    }
   }
   return produits;
 }
@@ -408,7 +445,13 @@ app.post('/webhook/whatsapp', async (req, res) => {
         if (['menu', 'aide', 'help'].includes(texte) ||
             ['bonjour', 'salut', 'bonsoir', 'hello', 'allo', 'allô'].includes(texte)) {
           await envoyerWhatsApp(phone_id, phone,
-            `👋 Bienvenue chez *${merchant.nom_boutique}* ! 🇸🇳\n\n1️⃣ Tapez *catalogue* — voir nos produits\n2️⃣ Tapez *commander* — passer une commande\n3️⃣ Tapez *mes commandes* — voir vos commandes\n\nNous livrons rapidement ! 📦`
+            `👋 Bienvenue chez *${merchant.nom_boutique}* ! 🇸🇳\n\n` +
+            `1️⃣ *catalogue* — voir nos produits\n` +
+            `2️⃣ *commander* — passer une commande\n` +
+            `3️⃣ *mes commandes* — suivre mes commandes\n` +
+            `4️⃣ *annuler* — annuler une commande\n` +
+            `5️⃣ *problème* — signaler un problème\n\n` +
+            `Livraison rapide à ${merchant.ville} ! 📦`
           );
         }
         // Catalogue
@@ -423,26 +466,99 @@ app.post('/webhook/whatsapp', async (req, res) => {
           } else {
             let msg = `📋 *Vos dernières commandes :*\n\n`;
             result.rows.forEach(o => {
-              const emoji = o.status === 'livré' ? '✅' : o.status === 'confirmé' ? '🔄' : '⏳';
-              msg += `${emoji} CMD-${String(o.id).padStart(4,'0')} — ${o.status.toUpperCase()}\n`;
+              const emoji = o.status === 'livré' ? '✅' : o.status === 'confirmé' ? '🔄' : o.status === 'annulé' ? '❌' : '⏳';
+              msg += `${emoji} CMD-${String(o.id).padStart(4,'0')} — ${o.status.toUpperCase()} — ${Number(o.total).toLocaleString('fr-FR')} FCFA\n`;
             });
-            msg += `\nPour suivre une commande, tapez son numéro. Ex: *CMD-0027*`;
+            msg += `\nPour suivre une commande, tapez son numéro. Ex: *CMD-0027*\nPour annuler, tapez *annuler CMD-XXXX*`;
             await envoyerWhatsApp(phone_id, phone, msg);
           }
         }
         // Suivi commande CMD-XXXX
-        else if (texte.match(/cmd-\d+/i)) {
+        else if (texte.match(/cmd-\d+/i) && !texte.includes('annul')) {
           const ref = texte.match(/cmd-(\d+)/i)[1];
           const result = await pool.query('SELECT * FROM orders WHERE id=$1', [parseInt(ref)]);
           if (result.rows[0]) {
             const o = result.rows[0];
-            const emoji = o.status === 'livré' ? '✅' : o.status === 'confirmé' ? '🔄' : '⏳';
+            const emoji = o.status === 'livré' ? '✅' : o.status === 'confirmé' ? '🔄' : o.status === 'annulé' ? '❌' : '⏳';
+            const items = (o.items || []).map(i => `• ${i.quantite} ${i.unite} de ${i.produit}`).join('\n');
             await envoyerWhatsApp(phone_id, phone,
-              `${emoji} *CMD-${String(o.id).padStart(4,'0')}*\n\nStatut : ${o.status.toUpperCase()}\nTotal : ${Number(o.total).toLocaleString('fr-FR')} FCFA\nDate : ${new Date(o.created_at).toLocaleDateString('fr-FR')}`
+              `${emoji} *CMD-${String(o.id).padStart(4,'0')}*\n\n` +
+              `📦 Produits :\n${items}\n\n` +
+              `💰 Total : *${Number(o.total).toLocaleString('fr-FR')} FCFA*\n` +
+              `📌 Statut : *${o.status.toUpperCase()}*\n` +
+              `📅 Date : ${new Date(o.created_at).toLocaleDateString('fr-FR')}\n\n` +
+              `Pour annuler cette commande, tapez *annuler CMD-${String(o.id).padStart(4,'0')}*`
             );
           } else {
             await envoyerWhatsApp(phone_id, phone, `❌ Commande introuvable. Vérifiez le numéro et réessayez.`);
           }
+        }
+        // Annulation commande
+        else if (texte.includes('annul')) {
+          const cmdMatch = texte.match(/cmd-(\d+)/i);
+          if (cmdMatch) {
+            const cmdId = parseInt(cmdMatch[1]);
+            const result = await pool.query('SELECT * FROM orders WHERE id=$1 AND customer_phone=$2', [cmdId, phone]);
+            if (result.rows[0]) {
+              const o = result.rows[0];
+              if (['livré', 'annulé'].includes(o.status)) {
+                await envoyerWhatsApp(phone_id, phone,
+                  `⚠️ CMD-${String(o.id).padStart(4,'0')} ne peut plus être annulée.\n` +
+                  `Statut actuel : *${o.status.toUpperCase()}*\n\n` +
+                  `Pour toute assistance, appelez le *+221 71 128 84 39* 📞`
+                );
+              } else {
+                await pool.query('UPDATE orders SET status=$1 WHERE id=$2', ['annulé', cmdId]);
+                await envoyerWhatsApp(phone_id, phone,
+                  `✅ *CMD-${String(o.id).padStart(4,'0')} annulée avec succès.*\n\n` +
+                  `Nous avons bien pris en compte votre annulation.\n` +
+                  `Montant : ${Number(o.total).toLocaleString('fr-FR')} FCFA\n\n` +
+                  `Tapez *catalogue* pour passer une nouvelle commande 🛒`
+                );
+              }
+            } else {
+              await envoyerWhatsApp(phone_id, phone,
+                `❌ Commande introuvable ou vous n'êtes pas autorisé à l'annuler.\n\n` +
+                `Tapez *mes commandes* pour voir vos commandes.`
+              );
+            }
+          } else {
+            // Annulation sans numéro — demander lequel
+            const result = await pool.query(
+              `SELECT * FROM orders WHERE customer_phone=$1 AND merchant_id=$2 AND status NOT IN ('livré','annulé') ORDER BY created_at DESC LIMIT 3`,
+              [phone, merchant.id]
+            );
+            if (result.rows.length === 0) {
+              await envoyerWhatsApp(phone_id, phone, `📋 Vous n'avez aucune commande en cours à annuler.`);
+            } else {
+              let msg = `❌ *Quelle commande voulez-vous annuler ?*\n\n`;
+              result.rows.forEach(o => {
+                msg += `• CMD-${String(o.id).padStart(4,'0')} — ${Number(o.total).toLocaleString('fr-FR')} FCFA — ${o.status}\n`;
+              });
+              msg += `\nRépondez avec le numéro. Ex: *annuler CMD-${String(result.rows[0].id).padStart(4,'0')}*`;
+              await envoyerWhatsApp(phone_id, phone, msg);
+            }
+          }
+        }
+        // Réclamations / Problèmes
+        else if (texte.includes('problème') || texte.includes('probleme') || texte.includes('réclamation') ||
+                 texte.includes('reclamation') || texte.includes('erreur') || texte.includes('plainte') ||
+                 texte.includes('mauvais') || texte.includes('pas reçu') || texte.includes('manquant') || texte === '5') {
+          const derniereCmd = await pool.query(
+            `SELECT * FROM orders WHERE customer_phone=$1 AND merchant_id=$2 ORDER BY created_at DESC LIMIT 1`,
+            [phone, merchant.id]
+          );
+          let msgReclamation = `🙏 *Nous sommes désolés pour ce problème.*\n\n`;
+          if (derniereCmd.rows[0]) {
+            const o = derniereCmd.rows[0];
+            msgReclamation += `Votre dernière commande :\n`;
+            msgReclamation += `📦 CMD-${String(o.id).padStart(4,'0')} — ${Number(o.total).toLocaleString('fr-FR')} FCFA\n`;
+            msgReclamation += `📌 Statut : ${o.status.toUpperCase()}\n\n`;
+          }
+          msgReclamation += `Notre équipe va traiter votre réclamation dans les plus brefs délais.\n\n`;
+          msgReclamation += `📞 Contactez directement notre gestionnaire :\n*+221 71 128 84 39*\n\n`;
+          msgReclamation += `Merci de votre patience ! 🇸🇳`;
+          await envoyerWhatsApp(phone_id, phone, msgReclamation);
         }
         // Commander
         else if (texte.includes('commander') || texte === '2') {
