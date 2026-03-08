@@ -366,6 +366,23 @@
   }
 </style>
 <link rel="manifest" href="/manifest.json"><meta name="theme-color" content="#006633"><script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js")}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:white;border-radius:20px;padding:28px;width:100%}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:20px}
+.modal-btns{display:flex;gap:12px}
+.btn{padding:12px 20px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;border:none}
+.btn-outline{background:white;border:1.5px solid #dde8dd;color:var(--texte)}
+.btn-or{background:var(--vert);color:white}
+.stock-row{display:flex;align-items:center;gap:12px;padding:10px;background:#f5f7f5;border-radius:10px}
+.stock-emoji{font-size:22px}
+.stock-nom{flex:1;font-weight:600;font-size:13px}
+.stock-input{width:70px;padding:8px;border:1.5px solid #dde8dd;border-radius:8px;font-size:14px;text-align:center;font-family:inherit}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:var(--vert);color:white;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+</style>
 </head>
 <body>
 
@@ -415,15 +432,30 @@
     <div class="loading"><div class="spinner"></div>Chargement...</div>
   </div>
 
-  <!-- Commandes + Produits -->
+  <!-- ANALYTICS CHARTS -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">📈 Revenus 7 derniers jours</div>
+      <canvas id="chart-revenus" height="160"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">🥧 Répartition statuts</div>
+      <canvas id="chart-statuts" height="160"></canvas>
+    </div>
+  </div>
+
+  <!-- Produits + Stock -->
   <div class="grid-2">
     <div class="card">
       <div class="card-title">📦 Produits populaires</div>
       <div id="produits-list"></div>
     </div>
     <div class="card">
-      <div class="card-title">📈 Activité aujourd'hui</div>
-      <div id="activite-list"></div>
+      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+        <span>🏭 Gestion stock</span>
+        <button onclick="afficherModalStock()" style="background:var(--vert);color:white;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Modifier</button>
+      </div>
+      <div id="stock-list"></div>
     </div>
   </div>
 
@@ -448,106 +480,219 @@
   </div>
 </main>
 
+<!-- MODAL STOCK -->
+<div class="modal-overlay" id="stock-modal">
+  <div class="modal" style="max-width:500px;width:90%">
+    <div class="modal-title">🏭 Modifier le stock</div>
+    <div id="stock-form-list" style="display:grid;gap:10px;max-height:60vh;overflow-y:auto;padding:4px"></div>
+    <div class="modal-btns" style="margin-top:16px">
+      <button class="btn btn-outline" onclick="document.getElementById('stock-modal').classList.remove('open')">Annuler</button>
+      <button class="btn btn-or" onclick="sauvegarderStock()">✅ Sauvegarder</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
 <script>
 const API = 'https://marchandpro-production-b529.up.railway.app';
 
 const PRODUITS_EMOJIS = {
-  'riz': '🌾', 'huile': '🫙', 'sucre': '🍬', 'farine': '🌾',
-  'mil': '🌿', 'tomate': '🍅', 'savon': '🧼', 'lait': '🥛'
+  'riz':'🌾','huile':'🫙','sucre':'🍚','farine':'🥖',
+  'mil':'🌾','tomate':'🥫','savon':'🧼','lait':'🥛'
 };
+
+const CATALOGUE_BASE = [
+  {nom:'Riz brisé',unite:'sac 50kg',prix:22000},
+  {nom:'Huile végétale',unite:'bidon 20L',prix:25000},
+  {nom:'Sucre',unite:'sac 50kg',prix:30000},
+  {nom:'Farine',unite:'sac 50kg',prix:20000},
+  {nom:'Mil',unite:'sac 50kg',prix:18000},
+  {nom:'Tomate concentrée',unite:'carton',prix:15000},
+  {nom:'Savon',unite:'carton',prix:12000},
+  {nom:'Lait en poudre',unite:'boite 2.5kg',prix:8500},
+];
+
+// Stock local (localStorage pour persistance)
+function getStock() {
+  try { return JSON.parse(localStorage.getItem('mp_stock') || '{}'); } catch(e) { return {}; }
+}
+function saveStock(s) { localStorage.setItem('mp_stock', JSON.stringify(s)); }
 
 function getEmoji(nom) {
   const n = nom.toLowerCase();
-  for (const [k, v] of Object.entries(PRODUITS_EMOJIS)) {
-    if (n.includes(k)) return v;
-  }
+  for (const [k,v] of Object.entries(PRODUITS_EMOJIS)) { if(n.includes(k)) return v; }
   return '📦';
 }
-
-function formatFCFA(n) {
-  return parseInt(n).toLocaleString('fr-FR') + ' FCFA';
-}
-
-function formatDate(d) {
-  return new Date(d).toLocaleDateString('fr-FR', {
-    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
-  });
-}
+function formatFCFA(n) { return parseInt(n).toLocaleString('fr-FR') + ' FCFA'; }
+function formatDate(d) { return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }
 
 let toutesCommandes = [];
+let chartRevenus = null;
+let chartStatuts = null;
 
-function getStatutStyle(status) {
-  if (status === 'payé') return 'background:#e8f5e9;color:#006633;border:1.5px solid #006633';
-  if (status === 'nouveau') return 'background:#fff9e6;color:#cc9900;border:1.5px solid #FFD700';
-  if (status === 'livré') return 'background:#e3f0ff;color:#1a5fb4;border:1.5px solid #1a5fb4';
-  if (status === 'annulé') return 'background:#fdecea;color:#c0392b;border:1.5px solid #c0392b';
-  return 'background:#f5f5f5;color:#666;border:1.5px solid #ccc';
+function toast(msg, ok=true) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = ok ? 'var(--vert)' : '#c0392b';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-function getStatutEmoji(status) {
-  if (status === 'payé') return '✅';
-  if (status === 'nouveau') return '🕐';
-  if (status === 'livré') return '🚚';
-  if (status === 'annulé') return '❌';
+function getStatutStyle(s) {
+  if(s==='payé') return 'background:#e8f5e9;color:#006633;border:1.5px solid #006633';
+  if(s==='nouveau') return 'background:#fff9e6;color:#cc9900;border:1.5px solid #FFD700';
+  if(s==='livré') return 'background:#e3f0ff;color:#1a5fb4;border:1.5px solid #1a5fb4';
+  if(s==='annulé') return 'background:#fdecea;color:#c0392b;border:1.5px solid #c0392b';
+  return 'background:#f5f5f5;color:#666;border:1.5px solid #ccc';
+}
+function getStatutEmoji(s) {
+  if(s==='payé') return '✅'; if(s==='nouveau') return '🕐';
+  if(s==='livré') return '🚚'; if(s==='annulé') return '❌';
   return '📋';
 }
 
+// ---- CHARTS ----
+function renderChartRevenus(commandes) {
+  const days = [];
+  const revenus = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const label = d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric'});
+    days.push(label);
+    const total = commandes
+      .filter(c => new Date(c.created_at).toDateString() === d.toDateString())
+      .reduce((s,c) => s + Number(c.total||0), 0);
+    revenus.push(Math.round(total/1000));
+  }
+  const ctx = document.getElementById('chart-revenus').getContext('2d');
+  if (chartRevenus) chartRevenus.destroy();
+  chartRevenus = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: days,
+      datasets: [{
+        label: 'Revenus (k FCFA)',
+        data: revenus,
+        backgroundColor: 'rgba(0,102,51,0.7)',
+        borderRadius: 8,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive:true, plugins:{legend:{display:false}},
+      scales:{y:{beginAtZero:true,ticks:{callback:v=>v+'k'}},x:{grid:{display:false}}}
+    }
+  });
+}
+
+function renderChartStatuts(commandes) {
+  const count = {};
+  commandes.forEach(c => { count[c.status]=(count[c.status]||0)+1; });
+  const labels = Object.keys(count);
+  const data = Object.values(count);
+  const colors = labels.map(s => s==='payé'?'#006633':s==='nouveau'?'#FFD700':s==='livré'?'#1a5fb4':'#c0392b');
+  const ctx = document.getElementById('chart-statuts').getContext('2d');
+  if (chartStatuts) chartStatuts.destroy();
+  chartStatuts = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2 }] },
+    options: { responsive:true, plugins:{ legend:{ position:'bottom', labels:{font:{size:12}} } } }
+  });
+}
+
+// ---- STOCK ----
+function renderStock() {
+  const stock = getStock();
+  document.getElementById('stock-list').innerHTML = CATALOGUE_BASE.map(p => {
+    const qte = stock[p.nom] ?? null;
+    const alerte = qte !== null && qte <= 5;
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0f0">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:22px">${getEmoji(p.nom)}</span>
+          <div>
+            <div style="font-weight:600;font-size:13px">${p.nom}</div>
+            <div style="font-size:11px;color:var(--texte-light)">${p.unite}</div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          ${qte !== null ? `
+            <div style="font-weight:700;font-size:16px;color:${alerte?'#c0392b':'var(--vert)'}">${qte}</div>
+            <div style="font-size:11px;color:${alerte?'#c0392b':'var(--texte-light)'}">${alerte?'⚠️ Stock faible':'en stock'}</div>
+          ` : `<div style="font-size:12px;color:var(--texte-light)">Non défini</div>`}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function afficherModalStock() {
+  const stock = getStock();
+  document.getElementById('stock-form-list').innerHTML = CATALOGUE_BASE.map(p => `
+    <div class="stock-row">
+      <span class="stock-emoji">${getEmoji(p.nom)}</span>
+      <span class="stock-nom">${p.nom}</span>
+      <input class="stock-input" type="number" min="0" id="stk-${p.nom.replace(/\s/g,'_')}"
+        value="${stock[p.nom] ?? ''}" placeholder="0" />
+    </div>
+  `).join('');
+  document.getElementById('stock-modal').classList.add('open');
+}
+
+function sauvegarderStock() {
+  const stock = {};
+  CATALOGUE_BASE.forEach(p => {
+    const id = 'stk-' + p.nom.replace(/\s/g,'_');
+    const val = document.getElementById(id)?.value;
+    if (val !== '' && val !== null && val !== undefined) stock[p.nom] = parseInt(val) || 0;
+  });
+  saveStock(stock);
+  document.getElementById('stock-modal').classList.remove('open');
+  renderStock();
+  toast('✅ Stock mis à jour !');
+}
+
+// ---- COMMANDES ----
 function renderCommandes(commandes) {
   document.getElementById('commandes-count').textContent = `${commandes.length} commandes`;
   document.getElementById('commandes-table').innerHTML = `
     <table>
-      <thead>
-        <tr>
-          <th>Référence</th>
-          <th>Client</th>
-          <th>Produits</th>
-          <th>Total</th>
-          <th>Statut</th>
-          <th>Date</th>
-          <th>Facture</th>
-        </tr>
-      </thead>
+      <thead><tr>
+        <th>Référence</th><th>Client</th><th>Produits</th>
+        <th>Total</th><th>Statut</th><th>Date</th><th>Facture</th>
+      </tr></thead>
       <tbody>
         ${commandes.map(cmd => `
           <tr>
             <td><span class="ref">CMD-${String(cmd.id).padStart(4,'0')}</span></td>
             <td><span class="phone">+${cmd.customer_phone}</span></td>
             <td style="font-size:13px">
-              ${(cmd.items||[]).filter(it=>it.produit&&it.produit.length>1).map(it=>
-                `${getEmoji(it.produit)} ${it.quantite}x ${it.produit}`
-              ).join('<br>')}
+              ${(cmd.items||[]).filter(it=>it.produit&&it.produit.length>1)
+                .map(it=>`${getEmoji(it.produit)} ${it.quantite}x ${it.produit}`).join('<br>')}
             </td>
             <td><span class="montant">${formatFCFA(cmd.total)}</span></td>
-            <td>
-              <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;font-size:12px;font-weight:700;${getStatutStyle(cmd.status)}">
-                ${getStatutEmoji(cmd.status)} ${cmd.status}
-              </span>
-            </td>
+            <td><span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;font-size:12px;font-weight:700;${getStatutStyle(cmd.status)}">
+              ${getStatutEmoji(cmd.status)} ${cmd.status}
+            </span></td>
             <td style="font-size:12px;color:var(--texte-light)">${formatDate(cmd.created_at)}</td>
-            <td>
-              <a href="${API}/api/facture/${cmd.id}" target="_blank"
-                style="display:inline-block;background:var(--vert-clair);color:var(--vert);padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;border:1px solid var(--vert)">
-                🧾 Voir
-              </a>
-            </td>
-          </tr>
-        `).join('')}
+            <td><a href="${API}/api/facture/${cmd.id}" target="_blank"
+              style="display:inline-block;background:var(--vert-clair);color:var(--vert);padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;border:1px solid var(--vert)">
+              🧾 Voir</a></td>
+          </tr>`).join('')}
       </tbody>
-    </table>
-  `;
+    </table>`;
 }
 
 function filtrerCommandes() {
   const q = document.getElementById('search-input').value.toLowerCase();
   if (!q) { renderCommandes(toutesCommandes); return; }
-  const filtered = toutesCommandes.filter(cmd => {
-    const ref = `CMD-${String(cmd.id).padStart(4,'0')}`.toLowerCase();
-    const phone = (cmd.customer_phone || '').toLowerCase();
-    const produits = (cmd.items || []).map(i => i.produit||'').join(' ').toLowerCase();
-    const status = (cmd.status || '').toLowerCase();
-    return ref.includes(q) || phone.includes(q) || produits.includes(q) || status.includes(q);
-  });
-  renderCommandes(filtered);
+  renderCommandes(toutesCommandes.filter(cmd => {
+    const ref = `cmd-${String(cmd.id).padStart(4,'0')}`;
+    const phone = (cmd.customer_phone||'').toLowerCase();
+    const produits = (cmd.items||[]).map(i=>i.produit||'').join(' ').toLowerCase();
+    return ref.includes(q)||phone.includes(q)||produits.includes(q)||(cmd.status||'').includes(q);
+  }));
 }
 
 function exportCSV() {
@@ -556,73 +701,52 @@ function exportCSV() {
     `CMD-${String(cmd.id).padStart(4,'0')}`,
     `+${cmd.customer_phone}`,
     (cmd.items||[]).filter(i=>i.produit&&i.produit.length>1).map(i=>`${i.quantite}x ${i.produit}`).join(' | '),
-    cmd.total,
-    cmd.status,
-    new Date(cmd.created_at).toLocaleDateString('fr-FR')
+    cmd.total, cmd.status, new Date(cmd.created_at).toLocaleDateString('fr-FR')
   ]);
-  const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
-  const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8;' });
+  const csv = [headers,...rows].map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = `marchandpro-commandes-${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
+  a.href=url; a.download=`marchandpro-${new Date().toISOString().slice(0,10)}.csv`; a.click();
 }
 
+// ---- MAIN ----
 async function loadDashboard() {
   try {
     const res = await fetch(`${API}/dashboard`);
     const data = await res.json();
 
-    document.getElementById('last-update').textContent =
-      'Mis à jour à ' + new Date().toLocaleTimeString('fr-FR');
+    document.getElementById('last-update').textContent = 'Mis à jour à ' + new Date().toLocaleTimeString('fr-FR');
 
     const { commandes, revenus_fcfa, impayes, clients } = data.kpis;
-    document.getElementById('kpi-grid').innerHTML = `
-      <div class="kpi-card vert">
-        <div class="kpi-icon">📋</div>
-        <div class="kpi-label">Commandes totales</div>
-        <div class="kpi-value">${commandes}</div>
-        <div class="kpi-sub">Toutes les commandes</div>
-      </div>
-      <div class="kpi-card or">
-        <div class="kpi-icon">💰</div>
-        <div class="kpi-label">Revenus</div>
-        <div class="kpi-value">${(revenus_fcfa/1000000).toFixed(2)}M</div>
-        <div class="kpi-sub">${formatFCFA(revenus_fcfa)}</div>
-      </div>
-      <div class="kpi-card bleu">
-        <div class="kpi-icon">👥</div>
-        <div class="kpi-label">Clients actifs</div>
-        <div class="kpi-value">${clients}</div>
-        <div class="kpi-sub">Numéros uniques</div>
-      </div>
-      <div class="kpi-card rouge">
-        <div class="kpi-icon">🧾</div>
-        <div class="kpi-label">Impayés</div>
-        <div class="kpi-value">${impayes}</div>
-        <div class="kpi-sub">Factures en attente</div>
-      </div>
-    `;
-
     const commandesData = data.commandes_recentes || [];
     toutesCommandes = commandesData;
+
+    // KPIs
+    const cmdAujourdhui = commandesData.filter(c => new Date(c.created_at).toDateString() === new Date().toDateString()).length;
+    document.getElementById('kpi-grid').innerHTML = `
+      <div class="kpi-card vert"><div class="kpi-icon">📋</div><div class="kpi-label">Commandes totales</div><div class="kpi-value">${commandes}</div><div class="kpi-sub">+${cmdAujourdhui} aujourd'hui</div></div>
+      <div class="kpi-card or"><div class="kpi-icon">💰</div><div class="kpi-label">Revenus</div><div class="kpi-value">${(revenus_fcfa/1000000).toFixed(2)}M</div><div class="kpi-sub">${formatFCFA(revenus_fcfa)}</div></div>
+      <div class="kpi-card bleu"><div class="kpi-icon">👥</div><div class="kpi-label">Clients actifs</div><div class="kpi-value">${clients}</div><div class="kpi-sub">Numéros uniques</div></div>
+      <div class="kpi-card rouge"><div class="kpi-icon">🧾</div><div class="kpi-label">Impayés</div><div class="kpi-value">${impayes}</div><div class="kpi-sub">En attente</div></div>
+    `;
+
+    // Charts
+    renderChartRevenus(commandesData);
+    renderChartStatuts(commandesData);
 
     // Produits populaires
     const produitCount = {};
     commandesData.forEach(cmd => {
-      (cmd.items || []).forEach(item => {
-        if (item.produit && item.produit.length > 1) {
-          produitCount[item.produit] = (produitCount[item.produit] || 0) + item.quantite;
-        }
+      (cmd.items||[]).forEach(item => {
+        if(item.produit&&item.produit.length>1)
+          produitCount[item.produit]=(produitCount[item.produit]||0)+item.quantite;
       });
     });
-
-    const produitsSorted = Object.entries(produitCount).sort((a,b) => b[1]-a[1]).slice(0,5);
-    const maxQty = produitsSorted[0]?.[1] || 1;
-
+    const produitsSorted = Object.entries(produitCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const maxQty = produitsSorted[0]?.[1]||1;
     document.getElementById('produits-list').innerHTML = produitsSorted.length ?
-      produitsSorted.map(([nom, qty]) => `
+      produitsSorted.map(([nom,qty])=>`
         <div class="produit-item">
           <div class="produit-info">
             <span class="produit-emoji">${getEmoji(nom)}</span>
@@ -632,43 +756,15 @@ async function loadDashboard() {
               <div class="progress-bar"><div class="progress-fill" style="width:${(qty/maxQty*100).toFixed(0)}%"></div></div>
             </div>
           </div>
-        </div>
-      `).join('') : '<div style="color:var(--texte-light);font-size:14px;text-align:center;padding:20px">Aucune donnée</div>';
+        </div>`).join('') :
+      '<div style="color:var(--texte-light);text-align:center;padding:20px">Aucune donnée</div>';
 
-    // Activité
-    const statusCount = {};
-    commandesData.forEach(c => {
-      statusCount[c.status] = (statusCount[c.status] || 0) + 1;
-    });
-
-    document.getElementById('activite-list').innerHTML = `
-      <div style="display:grid;gap:12px">
-        ${Object.entries(statusCount).map(([s, n]) => `
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--gris-bg);border-radius:10px">
-            <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;font-size:12px;font-weight:700;${getStatutStyle(s)}">
-              ${getStatutEmoji(s)} ${s}
-            </span>
-            <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px">${n}</span>
-          </div>
-        `).join('')}
-        <div style="padding:12px;background:var(--vert-clair);border-radius:10px;text-align:center">
-          <div style="font-size:12px;color:var(--texte-light)">Valeur moy. commande</div>
-          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--vert);font-size:18px">
-            ${commandes > 0 ? formatFCFA(Math.round(revenus_fcfa/commandes)) : '0 FCFA'}
-          </div>
-        </div>
-      </div>
-    `;
-
+    // Stock
+    renderStock();
     renderCommandes(commandesData);
 
-  } catch (err) {
-    document.getElementById('kpi-grid').innerHTML = `
-      <div class="error-msg" style="grid-column:1/-1">
-        ❌ Erreur de connexion au serveur.<br>
-        <small>${err.message}</small>
-      </div>
-    `;
+  } catch(err) {
+    document.getElementById('kpi-grid').innerHTML = `<div class="error-msg" style="grid-column:1/-1">❌ Erreur: ${err.message}</div>`;
   }
 }
 
