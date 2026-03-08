@@ -1465,67 +1465,105 @@ app.get('/catalogue/:id', (req, res) => res.sendFile(path.join(__dirname, 'publi
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 async function envoyerRelances() {
   try {
-    console.log('🔔 Vérification des relances...');
+    console.log('🔔 Vérification des relances impayés...');
+    const BASE = 'https://marchandpro-production-b529.up.railway.app';
 
-    // Clients inactifs depuis 7 jours
+    // Commandes impayées (statut nouveau) groupées par client et merchant
     const result = await pool.query(`
+      SELECT o.id, o.customer_phone, o.total, o.created_at, o.merchant_id,
+        m.nom_boutique, m.whatsapp as merchant_wa,
+        EXTRACT(EPOCH FROM (NOW() - o.created_at))/86400 as jours
+      FROM orders o
+      JOIN merchants m ON m.id = o.merchant_id
+      WHERE o.status = 'nouveau'
+      AND o.created_at < NOW() - INTERVAL '1 day'
+      ORDER BY o.created_at ASC
+    `);
+
+    console.log(`📊 ${result.rows.length} commande(s) impayée(s)`);
+    let envoyes = 0;
+
+    for (const cmd of result.rows) {
+      const jours = Math.floor(cmd.jours);
+      const ref = `CMD-${String(cmd.id).padStart(4,'0')}`;
+      const montant = parseInt(cmd.total).toLocaleString('fr-FR');
+      let message = '';
+
+      if (jours >= 1 && jours < 3) {
+        // J+1 — Doux
+        message =
+          `👋 Bonjour !\n\n` +
+          `Votre commande *${ref}* d'un montant de *${montant} FCFA* est en attente de paiement.\n\n` +
+          `Réglez facilement via *Orange Money* ou *Wave* 📱\n\n` +
+          `Une question ? Répondez à ce message.\n\n` +
+          `_MarchandPro 🇸🇳_`;
+      } else if (jours >= 3 && jours < 7) {
+        // J+3 — Ferme
+        message =
+          `🔔 *Rappel de paiement*\n\n` +
+          `Commande *${ref}* — *${montant} FCFA*\n` +
+          `En attente depuis *${jours} jours*.\n\n` +
+          `Merci de régulariser votre situation dans les plus brefs délais.\n\n` +
+          `Contactez-nous : +221 71 128 84 39\n\n` +
+          `_MarchandPro 🇸🇳_`;
+      } else if (jours >= 7) {
+        // J+7 — Urgent
+        message =
+          `⚠️ *Dernier rappel — ${ref}*\n\n` +
+          `Montant dû : *${montant} FCFA*\n` +
+          `Impayé depuis *${jours} jours*.\n\n` +
+          `Sans retour de votre part, votre accès au service sera suspendu.\n\n` +
+          `Réglez maintenant ou appelez le *+221 71 128 84 39*\n\n` +
+          `_MarchandPro 🇸🇳_`;
+      }
+
+      if (message) {
+        await envoyerWhatsApp(process.env.PHONE_NUMBER_ID, cmd.customer_phone, message);
+        console.log(`✅ Relance J+${jours} → +${cmd.customer_phone} — ${ref} — ${montant} FCFA`);
+        envoyes++;
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+
+    // Relances clients inactifs (pas de commande depuis 7 jours)
+    const inactifs = await pool.query(`
       SELECT DISTINCT customer_phone,
         MAX(created_at) as derniere_commande,
-        COUNT(*) as nb_commandes,
-        SUM(CAST(total AS NUMERIC)) as total_achats
+        COUNT(*) as nb_commandes
       FROM orders
       GROUP BY customer_phone
       HAVING MAX(created_at) < NOW() - INTERVAL '7 days'
+        AND MAX(created_at) > NOW() - INTERVAL '30 days'
     `);
 
-    console.log(`📊 ${result.rows.length} client(s) inactif(s) trouvé(s)`);
+    for (const client of inactifs.rows) {
+      const jours = Math.floor((Date.now() - new Date(client.derniere_commande)) / 86400000);
+      const message =
+        `👋 Bonjour ! Ici *MarchandPro* 🇸🇳\n\n` +
+        `Votre dernière commande date de *${jours} jours*.\n\n` +
+        `🎁 Revenez commander aujourd'hui :\n` +
+        `• Remise *3%* dès 5 unités\n` +
+        `• Remise *5%* dès 10 unités\n\n` +
+        `Répondez *catalogue* pour voir nos produits 🛒`;
 
-    for (const client of result.rows) {
-      const phone = client.customer_phone;
-      const nbCommandes = parseInt(client.nb_commandes);
-      const totalAchats = parseInt(client.total_achats || 0);
-      const joursInactif = Math.floor((Date.now() - new Date(client.derniere_commande)) / (1000 * 60 * 60 * 24));
-
-      const message = `👋 Bonjour ! Ici *MarchandPro* 🇸🇳\n\n` +
-        `Vous nous manquez ! Votre dernière commande date de *${joursInactif} jours*.\n\n` +
-        `🎁 *Offre spéciale* pour vous :\n` +
-        `Commandez aujourd'hui et bénéficiez d'une remise *5%* sur toute commande de 10 unités ou plus !\n\n` +
-        `📦 Nos produits disponibles :\n` +
-        `• Riz brisé — 22 000 FCFA/sac\n` +
-        `• Huile végétale — 25 000 FCFA/bidon\n` +
-        `• Sucre — 30 000 FCFA/sac\n\n` +
-        `Répondez *catalogue* pour voir tous nos produits 🛒`;
-
-      const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
-      const META_TOKEN = process.env.META_TOKEN;
-
-      await fetch(`https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${META_TOKEN}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to: phone,
-          type: 'text',
-          text: { body: message }
-        })
-      });
-
-      console.log(`✅ Relance envoyée à +${phone} (${joursInactif} jours inactif)`);
-
-      // Attendre 2 secondes entre chaque message
+      await envoyerWhatsApp(process.env.PHONE_NUMBER_ID, client.customer_phone, message);
+      console.log(`✅ Relance inactif → +${client.customer_phone} (${jours}j)`);
+      envoyes++;
       await new Promise(r => setTimeout(r, 2000));
     }
 
-    console.log('✅ Relances terminées');
+    console.log(`✅ ${envoyes} relance(s) envoyée(s)`);
+    return envoyes;
   } catch (err) {
     console.error('❌ Erreur relances:', err.message);
+    return 0;
   }
 }
 
 // Route manuelle pour tester les relances
 app.get('/api/relances', async (req, res) => {
-  await envoyerRelances();
-  res.json({ ok: true, message: 'Relances envoyées !' });
+  const envoyes = await envoyerRelances();
+  res.json({ ok: true, message: `${envoyes} relance(s) envoyée(s) !` });
 });
 
 // Lancer les relances tous les jours à 9h du matin
