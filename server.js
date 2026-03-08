@@ -1214,9 +1214,10 @@ td { padding:10px 8px;border-bottom:1px solid #f5f5f5; }
 <div class="footer">MarchandPro 🇸🇳 — <a href="/" style="color:#006633">Accueil</a></div>
 <script>
 const API = 'https://marchandpro-production-b529.up.railway.app';
+const LIEN_PARRAINAGE = '${lienParrainage || ""}';
 
 function copierLien() {
-  navigator.clipboard.writeText('${lienParrainage}').then(() => {
+  navigator.clipboard.writeText(LIEN_PARRAINAGE).then(() => {
     const btn = document.querySelector('.btn-copy');
     btn.textContent = '✅ Lien copié !';
     setTimeout(() => btn.textContent = '📋 Copier le lien de parrainage', 2000);
@@ -1353,7 +1354,7 @@ async function inscrire() {
     });
     const data = await res.json();
     if (data.ok) {
-      const lienParrainage = `${window.location.origin}/inscription?ref=${data.referral_code}`;
+      const lienParrainage = window.location.origin + '/inscription?ref=' + data.referral_code;
       document.getElementById('success').style.display='block';
       document.getElementById('success').innerHTML =
         '🎉 Inscription réussie !<br>Vous allez recevoir un message WhatsApp de bienvenue.<br><br>' +
