@@ -1344,7 +1344,216 @@ fetch(API+'/api/merchants/${id}/parrainage').then(r=>r.json()).then(data=>{
 </html>`);
 });
 
-// Formulaire d'inscription grossiste
+// Mini-site boutique publique
+app.get('/boutique/:slug', async (req, res) => {
+  const { slug } = req.params;
+  // Chercher par nom normalisé ou par id
+  const result = await pool.query(`
+    SELECT * FROM merchants 
+    WHERE actif=true AND (
+      LOWER(REPLACE(REPLACE(nom_boutique,' ','-'),'_','-')) = LOWER($1)
+      OR id::text = $1
+    ) LIMIT 1
+  `, [slug]);
+  if (!result.rows[0]) return res.status(404).send(`
+    <html><body style="font-family:sans-serif;text-align:center;padding:60px;background:#f5f7f5">
+    <div style="font-size:60px">🔍</div>
+    <h2 style="color:#006633;margin:20px 0">Boutique introuvable</h2>
+    <p>Ce lien n'existe pas ou la boutique est inactive.</p>
+    <a href="/" style="color:#006633;font-weight:700">← Retour à MarchandPro</a>
+    </body></html>
+  `);
+
+  const m = result.rows[0];
+  const catalogue = Array.isArray(m.catalogue) ? m.catalogue : JSON.parse(m.catalogue || '[]');
+  const BASE = 'https://marchandpro-production-b529.up.railway.app';
+  const WA = `https://wa.me/221711288439?text=${encodeURIComponent(`Bonjour ${m.nom_boutique} ! Je veux commander.`)}`;
+
+  const SECTEUR_COLORS = {
+    alimentaire: '#006633', menagers: '#1565C0', poisson: '#00838F',
+    pharmacie: '#AD1457', quincaillerie: '#E65100', telephonie: '#4527A0', textile: '#558B2F'
+  };
+  const SECTEUR_EMOJIS = {
+    alimentaire:'🌾', menagers:'🧴', poisson:'🐟',
+    pharmacie:'💊', quincaillerie:'🔧', telephonie:'📱', textile:'👗'
+  };
+
+  const couleur = SECTEUR_COLORS[m.secteur] || '#006633';
+  const emoji = SECTEUR_EMOJIS[m.secteur] || '🛒';
+
+  res.send(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${m.nom_boutique} — MarchandPro</title>
+<meta property="og:title" content="${m.nom_boutique} — Commandez sur WhatsApp">
+<meta property="og:description" content="Commandez facilement chez ${m.nom_boutique} via WhatsApp. Catalogue digital, livraison rapide.">
+<meta property="og:image" content="${BASE}/images/og-marchandpro.png">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:#f5f7f5;color:#1a2e1a;min-height:100vh}
+.header{background:linear-gradient(135deg,${couleur}dd,${couleur});color:white;padding:0 0 40px}
+.header-top{display:flex;align-items:center;justify-content:space-between;padding:16px 20px}
+.header-logo{font-size:13px;font-weight:700;opacity:0.8}
+.header-share{background:rgba(255,255,255,0.2);border:none;color:white;padding:8px 16px;border-radius:50px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.avatar-wrap{text-align:center;padding:24px 20px 0}
+.avatar{width:90px;height:90px;border-radius:50%;background:rgba(255,255,255,0.2);border:4px solid rgba(255,255,255,0.5);display:flex;align-items:center;justify-content:center;font-size:44px;margin:0 auto 16px}
+.boutique-nom{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;margin-bottom:6px}
+.boutique-meta{font-size:14px;opacity:0.85;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
+.meta-badge{background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:50px;font-size:12px;font-weight:600}
+.container{max-width:600px;margin:0 auto;padding:20px}
+.card{background:white;border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:0 2px 16px rgba(0,0,0,0.06)}
+.card-title{font-weight:700;font-size:15px;margin-bottom:16px;color:#1a2e1a;display:flex;align-items:center;gap:8px}
+.btn-wa{display:flex;align-items:center;justify-content:center;gap:10px;background:#25D366;color:white;padding:16px 24px;border-radius:14px;font-size:16px;font-weight:800;text-decoration:none;margin-bottom:12px;box-shadow:0 4px 20px rgba(37,211,102,0.35)}
+.btn-catalogue{display:flex;align-items:center;justify-content:center;gap:8px;background:#e8f5e9;color:${couleur};padding:13px 24px;border-radius:14px;font-size:14px;font-weight:700;text-decoration:none;border:2px solid ${couleur}}
+.produit{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f5f5f5}
+.produit:last-child{border-bottom:none}
+.produit-left{display:flex;align-items:center;gap:12px}
+.produit-emoji{font-size:28px}
+.produit-nom{font-weight:600;font-size:14px}
+.produit-unite{font-size:12px;color:#5a7a5a;margin-top:2px}
+.produit-prix{font-weight:800;font-size:15px;color:${couleur};white-space:nowrap}
+.info-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5;font-size:14px}
+.info-row:last-child{border-bottom:none}
+.info-icon{font-size:18px;flex-shrink:0;width:28px;text-align:center}
+.info-label{color:#5a7a5a;font-size:12px}
+.info-val{font-weight:600}
+.plan-badge{display:inline-block;padding:4px 12px;border-radius:50px;font-size:11px;font-weight:800;background:#fff9e6;color:#cc9900;border:1px solid #FFD700}
+.qr-wrap{text-align:center;padding:8px}
+.qr-label{font-size:13px;color:#5a7a5a;margin-top:12px}
+.remise-note{background:#e8f5e9;border-radius:10px;padding:12px 14px;font-size:13px;color:${couleur};font-weight:600;margin-bottom:16px}
+.footer-mini{text-align:center;padding:24px 20px;color:#5a7a5a;font-size:12px}
+.footer-mini a{color:${couleur};font-weight:700;text-decoration:none}
+.powered{display:inline-flex;align-items:center;gap:6px;background:white;border:1px solid #e8f5e9;padding:6px 14px;border-radius:50px;font-size:12px;font-weight:700;color:#006633;text-decoration:none;margin-top:8px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div class="header-logo">🛒 MarchandPro</div>
+    <button class="header-share" onclick="partager()">📤 Partager</button>
+  </div>
+  <div class="avatar-wrap">
+    <div class="avatar">${emoji}</div>
+    <div class="boutique-nom">${m.nom_boutique}</div>
+    <div class="boutique-meta">
+      <span class="meta-badge">📍 ${m.ville}</span>
+      <span class="meta-badge">${emoji} ${m.secteur || 'Alimentaire'}</span>
+      <span class="meta-badge">✅ Ouvert</span>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- COMMANDER -->
+  <div class="card">
+    <div class="remise-note">🎁 Remise 3% dès 5 unités · Remise 5% dès 10 unités</div>
+    <a href="${WA}" class="btn-wa" target="_blank">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+      Commander sur WhatsApp
+    </a>
+    <a href="${BASE}/catalogue/${m.id}" class="btn-catalogue">📦 Voir le catalogue complet</a>
+  </div>
+
+  <!-- INFOS BOUTIQUE -->
+  <div class="card">
+    <div class="card-title">ℹ️ Infos boutique</div>
+    <div class="info-row">
+      <div class="info-icon">🏪</div>
+      <div><div class="info-label">Boutique</div><div class="info-val">${m.nom_boutique}</div></div>
+    </div>
+    <div class="info-row">
+      <div class="info-icon">👤</div>
+      <div><div class="info-label">Propriétaire</div><div class="info-val">${m.proprietaire || 'Non renseigné'}</div></div>
+    </div>
+    <div class="info-row">
+      <div class="info-icon">📍</div>
+      <div><div class="info-label">Ville</div><div class="info-val">${m.ville}</div></div>
+    </div>
+    <div class="info-row">
+      <div class="info-icon">📦</div>
+      <div><div class="info-label">Secteur</div><div class="info-val">${emoji} ${m.secteur || 'Alimentaire'}</div></div>
+    </div>
+    <div class="info-row">
+      <div class="info-icon">⭐</div>
+      <div><div class="info-label">Plan</div><div class="info-val"><span class="plan-badge">Plan ${m.plan}</span></div></div>
+    </div>
+    <div class="info-row">
+      <div class="info-icon">🕐</div>
+      <div><div class="info-label">Disponibilité bot</div><div class="info-val">24h/24 — 7j/7</div></div>
+    </div>
+  </div>
+
+  <!-- PRODUITS -->
+  ${catalogue.length > 0 ? `
+  <div class="card">
+    <div class="card-title">📦 Produits disponibles</div>
+    ${catalogue.slice(0,6).map(p => {
+      const emojis = {'riz':'🌾','huile':'🫙','sucre':'🍚','farine':'🥖','mil':'🌾','tomate':'🥫','savon':'🧼','lait':'🥛','omo':'🧴','javel':'🧹','thiof':'🐟','capitaine':'🐠','sardine':'🐟'};
+      const em = Object.entries(emojis).find(([k]) => p.nom.toLowerCase().includes(k))?.[1] || '📦';
+      return `<div class="produit">
+        <div class="produit-left">
+          <span class="produit-emoji">${em}</span>
+          <div><div class="produit-nom">${p.nom}</div><div class="produit-unite">${p.unite}</div></div>
+        </div>
+        <div class="produit-prix">${(p.prix||0).toLocaleString('fr-FR')} F</div>
+      </div>`;
+    }).join('')}
+    ${catalogue.length > 6 ? `<div style="text-align:center;padding:12px 0;font-size:13px;color:#5a7a5a">+ ${catalogue.length-6} autres produits →  <a href="${BASE}/catalogue/${m.id}" style="color:${couleur};font-weight:700">Voir tout</a></div>` : ''}
+  </div>` : ''}
+
+  <!-- QR CODE -->
+  <div class="card">
+    <div class="card-title">📱 Partagez cette boutique</div>
+    <div class="qr-wrap">
+      <div id="qr-boutique"></div>
+      <div class="qr-label">Scannez pour accéder à la boutique</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer-mini">
+  <div>Propulsé par</div>
+  <a href="/" class="powered">🛒 MarchandPro — La solution des grossistes sénégalais</a>
+</div>
+
+<script>
+const URL_BOUTIQUE = '${BASE}/boutique/${slug}';
+
+new QRCode(document.getElementById('qr-boutique'), {
+  text: URL_BOUTIQUE,
+  width: 150, height: 150,
+  colorDark: '${couleur}',
+  colorLight: '#ffffff',
+  correctLevel: QRCode.CorrectLevel.H
+});
+
+function partager() {
+  if (navigator.share) {
+    navigator.share({
+      title: '${m.nom_boutique} — Commandez sur WhatsApp',
+      text: 'Commandez facilement chez ${m.nom_boutique} via WhatsApp !',
+      url: URL_BOUTIQUE
+    });
+  } else {
+    navigator.clipboard.writeText(URL_BOUTIQUE).then(() => {
+      alert('Lien copié ! Partagez-le sur WhatsApp 📤');
+    });
+  }
+}
+</script>
+</body>
+</html>`);
+});
+
+// Alias /boutique/:slug par nom
+app.get('/b/:slug', (req, res) => res.redirect('/boutique/' + req.params.slug));
 app.get('/inscription', (req, res) => {
   res.send(`
 <!DOCTYPE html>
