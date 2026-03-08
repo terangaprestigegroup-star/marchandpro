@@ -577,6 +577,10 @@ app.get('/migrate', async (req, res) => {
   try {
     await pool.query(`ALTER TABLE orders ALTER COLUMN customer_phone TYPE VARCHAR(50)`);
     await pool.query(`ALTER TABLE clients ALTER COLUMN phone TYPE VARCHAR(50)`);
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS merchant_id INTEGER DEFAULT 1`);
+    await pool.query(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS merchant_id INTEGER DEFAULT 1`);
+    await pool.query(`UPDATE orders SET merchant_id=1 WHERE merchant_id IS NULL`);
+    await pool.query(`UPDATE clients SET merchant_id=1 WHERE merchant_id IS NULL`);
     res.json({ ok: true, message: 'Migration reussie!' });
   } catch(err) {
     res.json({ ok: false, error: err.message });
