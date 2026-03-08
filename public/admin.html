@@ -221,6 +221,26 @@ tr:hover td { background:#fafcfa; }
   </div>
 </div>
 
+<!-- MODAL PLAN -->
+<div class="modal-overlay" id="plan-modal">
+  <div class="modal">
+    <div class="modal-title" id="plan-modal-title">⭐ Changer le plan</div>
+    <input type="hidden" id="plan-merchant-id" />
+    <div class="modal-field">
+      <label>Choisir le plan</label>
+      <select id="plan-select">
+        <option value="gratuit">⚪ Gratuit — 0 FCFA/mois</option>
+        <option value="starter">🔵 Starter — 15 000 FCFA/mois</option>
+        <option value="pro">⭐ Pro — 35 000 FCFA/mois</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="document.getElementById('plan-modal').classList.remove('open')">Annuler</button>
+      <button class="btn btn-or" onclick="confirmerPlan()">✅ Confirmer</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -325,19 +345,24 @@ function filtrer() {
   ));
 }
 
-async function changerPlan(id, planActuel, nom) {
-  const plans = ['gratuit','starter','pro'];
-  const labels = {'gratuit':'Gratuit — 0 FCFA','starter':'Starter — 15 000 FCFA/mois','pro':'Pro — 35 000 FCFA/mois'};
-  const nouveauPlan = prompt(`Plan actuel de ${nom}: ${planActuel}\n\nChoisir:\n- gratuit\n- starter\n- pro`);
-  if (!nouveauPlan || !plans.includes(nouveauPlan)) { toast('Plan invalide !', false); return; }
+function changerPlan(id, planActuel, nom) {
+  document.getElementById('plan-modal-title').textContent = `⭐ Plan de ${nom}`;
+  document.getElementById('plan-select').value = planActuel;
+  document.getElementById('plan-merchant-id').value = id;
+  document.getElementById('plan-modal').classList.add('open');
+}
+
+async function confirmerPlan() {
+  const id = document.getElementById('plan-merchant-id').value;
+  const plan = document.getElementById('plan-select').value;
   try {
     const res = await fetch(`${API}/api/merchants/${id}/plan`, {
       method:'PUT',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({plan:nouveauPlan})
+      body:JSON.stringify({plan})
     });
     const data = await res.json();
-    if (data.ok) { toast(`✅ Plan changé vers ${nouveauPlan} !`); charger(); }
+    if (data.ok) { toast(`✅ Plan changé vers ${plan} !`); document.getElementById('plan-modal').classList.remove('open'); charger(); }
     else toast('Erreur: ' + data.error, false);
   } catch(err) { toast('Erreur serveur', false); }
 }
