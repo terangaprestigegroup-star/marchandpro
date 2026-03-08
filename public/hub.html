@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Teranga Biz — Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<style>
+* { margin:0;padding:0;box-sizing:border-box; }
+body { font-family:'DM Sans',sans-serif;background:#f0f4f0;color:#1a2e1a;min-height:100vh; }
+
+.header {
+  background:linear-gradient(135deg,#004d26,#006633);
+  color:white;padding:32px 20px;text-align:center;
+}
+.header h1 { font-family:'Playfair Display',serif;font-size:28px;font-weight:700;margin-bottom:6px; }
+.header h1 span { color:#FFD700; }
+.header p { font-size:14px;opacity:0.8; }
+
+.container { max-width:600px;margin:0 auto;padding:24px 16px 40px; }
+
+.section-title {
+  font-size:11px;font-weight:700;text-transform:uppercase;
+  letter-spacing:1px;color:#5a7a5a;margin:24px 0 12px;
+}
+
+.links-grid { display:grid;gap:10px; }
+
+.link-card {
+  background:white;border-radius:14px;padding:16px 20px;
+  display:flex;align-items:center;gap:16px;
+  text-decoration:none;color:#1a2e1a;
+  box-shadow:0 2px 12px rgba(0,102,51,0.08);
+  transition:all 0.2s;border:2px solid transparent;
+}
+.link-card:hover { transform:translateY(-2px);border-color:#006633;box-shadow:0 6px 24px rgba(0,102,51,0.15); }
+.link-card:active { transform:scale(0.98); }
+
+.link-icon {
+  width:44px;height:44px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;flex-shrink:0;
+}
+.link-icon.vert { background:#e8f5e9; }
+.link-icon.or { background:#fff9e6; }
+.link-icon.bleu { background:#e3f0ff; }
+.link-icon.rouge { background:#fdecea; }
+.link-icon.wa { background:#e8f9ef; }
+
+.link-info { flex:1; }
+.link-nom { font-weight:700;font-size:15px;margin-bottom:2px; }
+.link-desc { font-size:12px;color:#5a7a5a; }
+.link-arrow { color:#006633;font-size:18px;opacity:0.5; }
+
+.footer { text-align:center;padding:20px;font-size:12px;color:#5a7a5a; }
+</style>
+<link rel="manifest" href="/manifest.json"><meta name="theme-color" content="#006633"><script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js")}</script>
+</head>
+<body>
+
+<div class="header">
+  <h1>🛒 Marchand<span>Pro</span></h1>
+  <p>Tableau de bord — Terangaprestige 🇸🇳</p>
+</div>
+
+<div class="container">
+
+  <div class="section-title">🏢 Gestion</div>
+  <div class="links-grid">
+    <a href="/admin" class="link-card">
+      <div class="link-icon or">👑</div>
+      <div class="link-info">
+        <div class="link-nom">Admin</div>
+        <div class="link-desc">Gérer les grossistes et abonnements</div>
+      </div>
+      <div class="link-arrow">→</div>
+    </a>
+    <a href="/app" class="link-card">
+      <div class="link-icon vert">📊</div>
+      <div class="link-info">
+        <div class="link-nom">Dashboard principal</div>
+        <div class="link-desc">Commandes, revenus, clients</div>
+      </div>
+      <div class="link-arrow">→</div>
+    </a>
+  </div>
+
+  <div class="section-title">🏪 Grossistes</div>
+  <div class="links-grid">
+    <a href="/inscription" class="link-card">
+      <div class="link-icon bleu">📝</div>
+      <div class="link-info">
+        <div class="link-nom">Inscription</div>
+        <div class="link-desc">Nouveau grossiste — formulaire gratuit</div>
+      </div>
+      <div class="link-arrow">→</div>
+    </a>
+    <a href="/merchant/1" class="link-card">
+      <div class="link-icon vert">🏪</div>
+      <div class="link-info">
+        <div class="link-nom">Teranga Biz Demo</div>
+        <div class="link-desc">Dashboard grossiste #1</div>
+      </div>
+      <div class="link-arrow">→</div>
+    </a>
+    <a href="/merchant/2" class="link-card">
+      <div class="link-icon vert">🏪</div>
+      <div class="link-info">
+        <div class="link-nom">Boutique Amadou</div>
+        <div class="link-desc">Dashboard grossiste #2</div>
+      </div>
+      <div class="link-arrow">→</div>
+    </a>
+  </div>
+
+  <div class="section-title">📦 Catalogues</div>
+  <div class="links-grid">
+    <a href="/catalogue/1" class="link-card">
+      <div class="link-icon or">📦</div>
+      <div class="link-info">
+        <div class="link-nom">Catalogue Teranga Biz Demo</div>
+        <div class="link-desc">Lien à partager aux clients</div>
+      </div>
+      <div class="link-arrow">→</div>
+    </a>
+    <a href="/catalogue/2" class="link-card">
+      <div class="link-icon or">📦</div>
+      <div class="link-info">
+        <div class="link-nom">Catalogue Boutique Amadou</div>
+        <div class="link-desc">Lien à partager aux clients</div>
+      </div>
+      <div class="link-arrow">→</div>
+    </a>
+  </div>
+
+  <div class="section-title">🌐 Public</div>
+  <div class="links-grid">
+    <a href="/" class="link-card">
+      <div class="link-icon bleu">🌐</div>
+      <div class="link-info">
+        <div class="link-nom">Page de vente</div>
+        <div class="link-desc">Page publique pour attirer les grossistes</div>
+      </div>
+      <div class="link-arrow">→</div>
+    </a>
+    <a href="https://wa.me/221711288439" target="_blank" class="link-card">
+      <div class="link-icon wa">📱</div>
+      <div class="link-info">
+        <div class="link-nom">Bot WhatsApp</div>
+        <div class="link-desc">+221 71 128 84 39 — Tester le bot</div>
+      </div>
+      <div class="link-arrow">→</div>
+    </a>
+  </div>
+
+  <div class="section-title">🔧 Outils</div>
+  <div class="links-grid">
+    <a href="/api/facture/36" target="_blank" class="link-card">
+      <div class="link-icon rouge">🧾</div>
+      <div class="link-info">
+        <div class="link-nom">Facture test</div>
+        <div class="link-desc">Exemple facture CMD-0036</div>
+      </div>
+      <div class="link-arrow">→</div>
+    </a>
+    <a href="/api/relances" target="_blank" class="link-card">
+      <div class="link-icon rouge">🔔</div>
+      <div class="link-info">
+        <div class="link-nom">Tester relances</div>
+        <div class="link-desc">Envoyer relances manuellement</div>
+      </div>
+      <div class="link-arrow">→</div>
+    </a>
+    <a href="/health" target="_blank" class="link-card">
+      <div class="link-icon vert">💚</div>
+      <div class="link-info">
+        <div class="link-nom">Santé serveur</div>
+        <div class="link-desc">Vérifier que Railway est actif</div>
+      </div>
+      <div class="link-arrow">→</div>
+    </a>
+  </div>
+
+</div>
+
+<div class="footer">Teranga Biz v2.1 — Terangaprestige 🇸🇳</div>
+
+</body>
+</html>
