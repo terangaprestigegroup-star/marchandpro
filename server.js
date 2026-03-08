@@ -1076,6 +1076,20 @@ app.post('/api/merchants/register', async (req, res) => {
   }
 });
 
+// Générer codes parrainage manquants
+app.get('/api/admin/generer-codes', async (req, res) => {
+  try {
+    const merchants = await pool.query('SELECT * FROM merchants WHERE referral_code IS NULL');
+    let updated = 0;
+    for (const m of merchants.rows) {
+      const code = genererCodeParrainage(m.nom_boutique);
+      await pool.query('UPDATE merchants SET referral_code=$1 WHERE id=$2', [code, m.id]);
+      updated++;
+    }
+    res.json({ ok: true, message: `${updated} codes générés !` });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
 // Stats parrainage d'un grossiste
 app.get('/api/merchants/:id/parrainage', async (req, res) => {
   try {
