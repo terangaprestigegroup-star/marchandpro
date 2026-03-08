@@ -142,16 +142,80 @@ async function initDB() {
   console.log('✅ Base de données MarchandPro initialisée');
 }
 
-const CATALOGUE = [
-  { nom: 'Riz brisé', unite: 'sac 50kg', prix: 22000, mots: ['riz'] },
-  { nom: 'Huile végétale', unite: 'bidon 20L', prix: 25000, mots: ['huile'] },
-  { nom: 'Sucre', unite: 'sac 50kg', prix: 30000, mots: ['sucre'] },
-  { nom: 'Farine', unite: 'sac 50kg', prix: 20000, mots: ['farine'] },
-  { nom: 'Mil', unite: 'sac 50kg', prix: 18000, mots: ['mil'] },
-  { nom: 'Tomate concentrée', unite: 'carton', prix: 15000, mots: ['tomate'] },
-  { nom: 'Savon', unite: 'carton', prix: 12000, mots: ['savon'] },
-  { nom: 'Lait en poudre', unite: 'boite 2.5kg', prix: 8500, mots: ['lait'] },
-];
+const SECTEURS = {
+  alimentaire: {
+    nom: 'Alimentaire',
+    emoji: '🌾',
+    catalogue: [
+      { nom: 'Riz brisé', unite: 'sac 50kg', prix: 22000, mots: ['riz'] },
+      { nom: 'Huile végétale', unite: 'bidon 20L', prix: 25000, mots: ['huile'] },
+      { nom: 'Sucre', unite: 'sac 50kg', prix: 30000, mots: ['sucre'] },
+      { nom: 'Farine', unite: 'sac 50kg', prix: 20000, mots: ['farine'] },
+      { nom: 'Mil', unite: 'sac 50kg', prix: 18000, mots: ['mil'] },
+      { nom: 'Tomate concentrée', unite: 'carton', prix: 15000, mots: ['tomate'] },
+      { nom: 'Savon', unite: 'carton', prix: 12000, mots: ['savon'] },
+      { nom: 'Lait en poudre', unite: 'boite 2.5kg', prix: 8500, mots: ['lait'] },
+    ]
+  },
+  pharmacie: {
+    nom: 'Pharmacie & Para',
+    emoji: '💊',
+    catalogue: [
+      { nom: 'Paracétamol 500mg', unite: 'boite 100cp', prix: 5000, mots: ['paracetamol','para','doliprane'] },
+      { nom: 'Ibuprofène 400mg', unite: 'boite 30cp', prix: 7500, mots: ['ibuprofene','ibu'] },
+      { nom: 'Sérum physiologique', unite: 'carton 24 unités', prix: 18000, mots: ['serum','physiologique'] },
+      { nom: 'Gants médicaux', unite: 'boite 100 pièces', prix: 12000, mots: ['gants','gant'] },
+      { nom: 'Masques chirurgicaux', unite: 'boite 50 pièces', prix: 8000, mots: ['masque','masques'] },
+      { nom: 'Crème hydratante', unite: 'carton 12 tubes', prix: 24000, mots: ['creme','hydratante'] },
+      { nom: 'Savon médical', unite: 'carton 24 savons', prix: 15000, mots: ['savon'] },
+      { nom: 'Vitamine C 1000mg', unite: 'boite 30cp', prix: 9000, mots: ['vitamine','vit'] },
+    ]
+  },
+  quincaillerie: {
+    nom: 'Quincaillerie',
+    emoji: '🔧',
+    catalogue: [
+      { nom: 'Ciment Portland', unite: 'sac 50kg', prix: 7500, mots: ['ciment','portland'] },
+      { nom: 'Fer à béton 10mm', unite: 'barre 12m', prix: 8500, mots: ['fer','beton'] },
+      { nom: 'Peinture blanche', unite: 'bidon 20L', prix: 35000, mots: ['peinture','blanche'] },
+      { nom: 'Visserie assortie', unite: 'boite 500 pièces', prix: 12000, mots: ['visserie','vis'] },
+      { nom: 'Câble électrique 2.5mm', unite: 'rouleau 100m', prix: 45000, mots: ['cable','electrique'] },
+      { nom: 'Tuyau PVC 32mm', unite: 'barre 4m', prix: 3500, mots: ['tuyau','pvc'] },
+      { nom: 'Carrelage 40x40', unite: 'm² (carton)', prix: 8000, mots: ['carrelage','carreau'] },
+      { nom: 'Plâtre en poudre', unite: 'sac 25kg', prix: 5500, mots: ['platre'] },
+    ]
+  },
+  telephonie: {
+    nom: 'Téléphonie',
+    emoji: '📱',
+    catalogue: [
+      { nom: 'Recharge Orange 500F', unite: 'lot 50 codes', prix: 25000, mots: ['recharge','orange'] },
+      { nom: 'Recharge Wave', unite: 'lot 50 codes', prix: 25000, mots: ['wave'] },
+      { nom: 'Coque iPhone', unite: 'lot 10 pièces', prix: 15000, mots: ['coque','iphone'] },
+      { nom: 'Coque Samsung', unite: 'lot 10 pièces', prix: 12000, mots: ['samsung'] },
+      { nom: 'Écouteurs filaires', unite: 'lot 10 pièces', prix: 20000, mots: ['ecouteur','ecouteurs'] },
+      { nom: 'Câble USB-C', unite: 'lot 10 pièces', prix: 18000, mots: ['cable','usb'] },
+      { nom: 'Batterie externe 10000mAh', unite: 'lot 5 pièces', prix: 35000, mots: ['batterie','externe'] },
+      { nom: 'Verre trempé', unite: 'lot 10 pièces', prix: 10000, mots: ['verre','trempe'] },
+    ]
+  },
+  textile: {
+    nom: 'Textile & Friperie',
+    emoji: '👗',
+    catalogue: [
+      { nom: 'Bazin riche', unite: 'coupon 5m', prix: 35000, mots: ['bazin'] },
+      { nom: 'Wax hollandais', unite: 'coupon 6m', prix: 45000, mots: ['wax','hollandais'] },
+      { nom: 'Tissu coton uni', unite: 'rouleau 50m', prix: 60000, mots: ['coton','uni'] },
+      { nom: 'Friperie mixte', unite: 'balle 45kg', prix: 85000, mots: ['friperie','frip'] },
+      { nom: 'T-shirts homme', unite: 'lot 12 pièces', prix: 24000, mots: ['tshirt','shirt'] },
+      { nom: 'Pantalons jeans', unite: 'lot 6 pièces', prix: 36000, mots: ['jean','pantalon'] },
+      { nom: 'Robes femme', unite: 'lot 6 pièces', prix: 30000, mots: ['robe'] },
+      { nom: 'Chaussures mixtes', unite: 'lot 6 paires', prix: 42000, mots: ['chaussure','chaussures'] },
+    ]
+  }
+};
+
+const CATALOGUE = SECTEURS.alimentaire.catalogue;
 
 function formaterCatalogue() {
   let msg = '📦 *Catalogue MarchandPro* 🇸🇳\n\n';
@@ -655,34 +719,45 @@ function genererFactureHTML(commande) {
 <html>
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Facture ${ref} — MarchandPro</title>
 <style>
-  body { font-family: Arial, sans-serif; padding: 40px; color: #1a2e1a; max-width: 700px; margin: 0 auto; }
-  .header { background: #006633; color: white; padding: 24px; border-radius: 12px; margin-bottom: 32px; display: flex; justify-content: space-between; align-items: center; }
-  .logo { font-size: 24px; font-weight: bold; }
-  .ref { font-size: 14px; opacity: 0.8; }
-  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
-  .info-box { background: #f5f7f5; padding: 16px; border-radius: 8px; }
+  * { margin:0;padding:0;box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; padding: 32px 20px; color: #1a2e1a; max-width: 720px; margin: 0 auto; background:#f5f7f5; }
+  .page { background:white; border-radius:16px; padding:40px; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
+  .header { background: linear-gradient(135deg,#004d26,#006633); color: white; padding: 24px 28px; border-radius: 12px; margin-bottom: 32px; display: flex; justify-content: space-between; align-items: center; }
+  .logo { font-size: 22px; font-weight: bold; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
+  .info-box { background: #f5f7f5; padding: 14px 16px; border-radius: 10px; border-left:3px solid #006633; }
   .info-label { font-size: 11px; color: #5a7a5a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
   .info-value { font-weight: bold; font-size: 14px; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-  th { background: #006633; color: white; padding: 10px 12px; text-align: left; font-size: 12px; }
-  td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
-  tr:hover td { background: #f5f7f5; }
-  .total-row { background: #e8f5e9; font-weight: bold; font-size: 15px; }
-  .total-row td { border: none; padding: 14px 12px; }
-  .footer { text-align: center; color: #5a7a5a; font-size: 12px; border-top: 2px solid #e8f5e9; padding-top: 16px; }
-  .badge { display: inline-block; background: #e8f5e9; color: #006633; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+  th { background: #006633; color: white; padding: 10px 14px; text-align: left; font-size: 12px; }
+  th:first-child { border-radius:8px 0 0 8px; }
+  th:last-child { border-radius:0 8px 8px 0; }
+  td { padding: 11px 14px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+  .total-row td { background:#e8f5e9; font-weight:bold; font-size:15px; border:none; padding:14px; }
+  .footer { text-align: center; color: #5a7a5a; font-size: 12px; border-top: 2px solid #e8f5e9; padding-top: 16px; margin-top:8px; }
+  .badge { display:inline-block; background:#e8f5e9; color:#006633; padding:3px 12px; border-radius:20px; font-size:12px; font-weight:bold; }
+  .btn-print { display:block; width:100%; background:#006633; color:white; border:none; padding:14px; border-radius:10px; font-size:15px; font-weight:700; cursor:pointer; margin-top:24px; font-family:inherit; }
+  .btn-print:hover { background:#004d26; }
+  @media print {
+    body { background:white; padding:0; }
+    .page { box-shadow:none; border-radius:0; padding:20px; }
+    .btn-print { display:none; }
+  }
 </style>
 </head>
 <body>
+<div class="page">
   <div class="header">
     <div>
       <div class="logo">🛒 MarchandPro</div>
       <div style="font-size:12px;opacity:0.7;margin-top:4px">Votre grossiste digital 🇸🇳</div>
     </div>
     <div style="text-align:right">
-      <div style="font-size:20px;font-weight:bold">${ref}</div>
-      <div class="ref">${date}</div>
+      <div style="font-size:22px;font-weight:bold">${ref}</div>
+      <div style="font-size:13px;opacity:0.8;margin-top:2px">${date}</div>
     </div>
   </div>
 
@@ -701,7 +776,7 @@ function genererFactureHTML(commande) {
     <thead>
       <tr>
         <th>Produit</th>
-        <th style="text-align:center">Quantite</th>
+        <th style="text-align:center">Quantité</th>
         <th style="text-align:right">Prix unitaire</th>
         <th style="text-align:right">Total</th>
       </tr>
@@ -709,16 +784,19 @@ function genererFactureHTML(commande) {
     <tbody>
       ${lignes}
       <tr class="total-row">
-        <td colspan="3">TOTAL</td>
+        <td colspan="3">TOTAL À PAYER</td>
         <td style="text-align:right">${total.toLocaleString('fr-FR')} FCFA</td>
       </tr>
     </tbody>
   </table>
 
   <div class="footer">
-    <p><b>MarchandPro</b> — WhatsApp : +221 71 128 84 39 | Dakar, Senegal</p>
+    <p><b>MarchandPro</b> — WhatsApp : +221 71 128 84 39 | Dakar, Sénégal</p>
     <p style="margin-top:4px">Merci pour votre confiance ! 🇸🇳</p>
   </div>
+
+  <button class="btn-print" onclick="window.print()">📥 Télécharger / Imprimer la facture</button>
+</div>
 </body>
 </html>`;
 }
@@ -765,9 +843,33 @@ app.get('/api/facture/:id', async (req, res) => {
   }
 });
 app.get('/app', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
-app.get('/health', (req, res) => res.json({ status: 'ok', app: 'MarchandPro', version: '2.0.0' }));
+app.get('/health', (req, res) => res.json({ status: 'ok', app: 'MarchandPro', version: '3.0.0' }));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'landing.html')));
-app.get('/api', (req, res) => res.json({ message: 'Bienvenue sur MarchandPro API 🇸🇳', version: '2.1.0', status: 'running' }));
+app.get('/api', (req, res) => res.json({ message: 'Bienvenue sur MarchandPro API 🇸🇳', version: '3.0.0', status: 'running' }));
+app.get('/manifest.json', (req, res) => res.sendFile(path.join(__dirname, 'public', 'manifest.json')));
+app.get('/sw.js', (req, res) => { res.setHeader('Content-Type','application/javascript'); res.sendFile(path.join(__dirname, 'public', 'sw.js')); });
+app.use('/images', express.static(path.join(__dirname, 'public', 'images')));
+
+// Facture PDF téléchargeable
+app.get('/api/facture/:id/pdf', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM orders WHERE id=$1', [req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Commande introuvable' });
+    const o = result.rows[0];
+    const html = genererFactureHTML(o);
+    // On renvoie le HTML avec header pour impression/PDF
+    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Content-Disposition', `inline; filename="facture-CMD-${String(o.id).padStart(4,'0')}.pdf"`);
+    res.send(html + `<script>
+      window.onload = function() {
+        document.title = 'Facture CMD-${String(o.id).padStart(4,'0')}';
+        setTimeout(() => window.print(), 800);
+      };
+    </script>`);
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ============================================
 // ONBOARDING MULTI-CLIENTS
@@ -776,16 +878,13 @@ app.get('/api', (req, res) => res.json({ message: 'Bienvenue sur MarchandPro API
 // Inscription nouveau grossiste
 app.post('/api/merchants/register', async (req, res) => {
   try {
-    const { nom_boutique, proprietaire, whatsapp, ville, produits } = req.body;
+    const { nom_boutique, proprietaire, whatsapp, ville, secteur, produits } = req.body;
     if (!nom_boutique || !whatsapp) return res.status(400).json({ error: 'Nom boutique et WhatsApp requis' });
 
-    // Nettoyer le numéro WhatsApp
     const wa = whatsapp.replace(/\D/g, '');
-
-    // Catalogue personnalisé ou catalogue par défaut
-    const catalogue = produits && produits.length > 0 ? produits : CATALOGUE.map(p => ({
-      nom: p.nom, unite: p.unite, prix: p.prix, mots: p.mots
-    }));
+    const secteurKey = secteur || 'alimentaire';
+    const catalogue = produits && produits.length > 0 ? produits :
+      (SECTEURS[secteurKey]?.catalogue || SECTEURS.alimentaire.catalogue);
 
     const result = await pool.query(
       `INSERT INTO merchants (nom_boutique, proprietaire, whatsapp, ville, plan, catalogue)
@@ -794,14 +893,16 @@ app.post('/api/merchants/register', async (req, res) => {
     );
 
     const merchant = result.rows[0];
-    console.log(`✅ Nouveau grossiste inscrit: ${nom_boutique} (${wa})`);
+    const secteurInfo = SECTEURS[secteurKey];
+    console.log(`✅ Nouveau grossiste inscrit: ${nom_boutique} (${wa}) — ${secteurInfo?.nom}`);
 
-    // Envoyer message de bienvenue
     const msgBienvenue = `🎉 Bienvenue sur *MarchandPro* !\n\n` +
       `Bonjour *${proprietaire || nom_boutique}* 🇸🇳\n\n` +
-      `Votre boutique *${nom_boutique}* est maintenant active !\n\n` +
-      `📊 Votre dashboard : ${process.env.BASE_URL || 'https://marchandpro-production-b529.up.railway.app'}/merchant/${merchant.id}\n\n` +
-      `Vos clients peuvent maintenant commander via WhatsApp 📱\n` +
+      `Votre boutique *${nom_boutique}* est maintenant active !\n` +
+      `Secteur : ${secteurInfo?.emoji} ${secteurInfo?.nom}\n\n` +
+      `📊 Votre dashboard : ${process.env.BASE_URL || 'https://marchandpro-production-b529.up.railway.app'}/merchant/${merchant.id}\n` +
+      `📦 Votre catalogue : ${process.env.BASE_URL || 'https://marchandpro-production-b529.up.railway.app'}/catalogue/${merchant.id}\n\n` +
+      `Partagez votre lien catalogue à vos clients 📱\n` +
       `Plan actuel : *Gratuit* (50 commandes/mois)\n\n` +
       `Pour passer au plan Starter à 15 000 FCFA/mois, répondez *UPGRADE* 🚀`;
 
@@ -951,6 +1052,11 @@ body { font-family:'DM Sans',sans-serif;background:#f0f4f0;color:#1a2e1a;min-hei
 label { display:block;font-size:13px;font-weight:600;color:#1a2e1a;margin-bottom:6px;margin-top:16px; }
 input, select { width:100%;padding:12px 16px;border:1.5px solid #dde8dd;border-radius:10px;font-size:14px;font-family:inherit;color:#1a2e1a;outline:none;transition:border 0.2s; }
 input:focus, select:focus { border-color:#006633; }
+.secteurs { display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px; }
+.secteur-btn { padding:12px 8px;border:2px solid #dde8dd;border-radius:12px;text-align:center;cursor:pointer;transition:all 0.2s;background:white;font-family:inherit;font-size:13px;font-weight:600;color:#5a7a5a; }
+.secteur-btn:hover { border-color:#006633;color:#006633; }
+.secteur-btn.selected { border-color:#006633;background:#e8f5e9;color:#006633; }
+.secteur-emoji { font-size:24px;display:block;margin-bottom:4px; }
 .btn { width:100%;background:#006633;color:white;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;margin-top:24px;font-family:inherit;transition:all 0.2s; }
 .btn:hover { background:#004d26; }
 .success { background:#e8f5e9;color:#006633;border-radius:10px;padding:16px;text-align:center;margin-top:16px;font-weight:600;display:none; }
@@ -961,56 +1067,65 @@ input:focus, select:focus { border-color:#006633; }
 <div class="card">
   <div class="logo">
     <h1>🛒 MarchandPro</h1>
-    <p>Inscrivez votre boutique — C'est gratuit !</p>
+    <p>Inscrivez votre boutique — C'est gratuit ! 🇸🇳</p>
   </div>
+  <label>Votre secteur d'activité *</label>
+  <div class="secteurs">
+    <button class="secteur-btn selected" onclick="selSecteur('alimentaire',this)"><span class="secteur-emoji">🌾</span>Alimentaire</button>
+    <button class="secteur-btn" onclick="selSecteur('pharmacie',this)"><span class="secteur-emoji">💊</span>Pharmacie</button>
+    <button class="secteur-btn" onclick="selSecteur('quincaillerie',this)"><span class="secteur-emoji">🔧</span>Quincaillerie</button>
+    <button class="secteur-btn" onclick="selSecteur('telephonie',this)"><span class="secteur-emoji">📱</span>Téléphonie</button>
+    <button class="secteur-btn" onclick="selSecteur('textile',this)" style="grid-column:1/-1"><span class="secteur-emoji">👗</span>Textile & Friperie</button>
+  </div>
+  <input type="hidden" id="secteur" value="alimentaire" />
   <label>Nom de votre boutique *</label>
-  <input id="nom_boutique" type="text" placeholder="Ex: Boutique Amadou, Grossiste Fatou..." />
+  <input id="nom_boutique" type="text" placeholder="Ex: Boutique Amadou, Pharmacie Fatou..." />
   <label>Votre nom *</label>
   <input id="proprietaire" type="text" placeholder="Ex: Amadou Diallo" />
   <label>Numéro WhatsApp *</label>
   <input id="whatsapp" type="tel" placeholder="Ex: 221771234567" />
   <label>Ville</label>
   <select id="ville">
-    <option>Dakar</option>
-    <option>Thiès</option>
-    <option>Pikine</option>
-    <option>Guédiawaye</option>
-    <option>Rufisque</option>
-    <option>Saint-Louis</option>
-    <option>Ziguinchor</option>
-    <option>Autre</option>
+    <option>Dakar</option><option>Thiès</option><option>Pikine</option>
+    <option>Guédiawaye</option><option>Rufisque</option><option>Saint-Louis</option>
+    <option>Ziguinchor</option><option>Autre</option>
   </select>
   <button class="btn" onclick="inscrire()">🚀 Créer mon espace gratuit</button>
   <div class="success" id="success"></div>
   <div class="error" id="error"></div>
 </div>
 <script>
+function selSecteur(val, el) {
+  document.querySelectorAll('.secteur-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('secteur').value = val;
+}
 async function inscrire() {
   const nom_boutique = document.getElementById('nom_boutique').value.trim();
   const proprietaire = document.getElementById('proprietaire').value.trim();
   const whatsapp = document.getElementById('whatsapp').value.trim();
   const ville = document.getElementById('ville').value;
-  if (!nom_boutique || !whatsapp) { 
+  const secteur = document.getElementById('secteur').value;
+  if (!nom_boutique || !whatsapp) {
     document.getElementById('error').style.display='block';
     document.getElementById('error').textContent='Nom de boutique et WhatsApp sont obligatoires !';
-    return; 
+    return;
   }
   document.querySelector('.btn').textContent = '⏳ Inscription en cours...';
   document.querySelector('.btn').disabled = true;
   try {
     const res = await fetch('/api/merchants/register', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({nom_boutique,proprietaire,whatsapp,ville})
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({nom_boutique,proprietaire,whatsapp,ville,secteur})
     });
     const data = await res.json();
     if (data.ok) {
       document.getElementById('success').style.display='block';
-      document.getElementById('success').innerHTML = '🎉 Inscription réussie !<br>Vous allez recevoir un message WhatsApp de bienvenue.<br><br><a href="/merchant/'+data.merchant_id+'" style="color:#006633;font-weight:700">👉 Accéder à mon dashboard</a>';
+      document.getElementById('success').innerHTML = '🎉 Inscription réussie !<br>Vous allez recevoir un message WhatsApp de bienvenue.<br><br>' +
+        '<a href="/merchant/'+data.merchant_id+'" style="color:#006633;font-weight:700">👉 Mon dashboard</a> &nbsp;|&nbsp; ' +
+        '<a href="/catalogue/'+data.merchant_id+'" style="color:#006633;font-weight:700">📦 Mon catalogue</a>';
       document.querySelector('.btn').style.display='none';
-    } else {
-      throw new Error(data.error);
-    }
+    } else { throw new Error(data.error); }
   } catch(err) {
     document.getElementById('error').style.display='block';
     document.getElementById('error').textContent = 'Erreur: ' + err.message;
@@ -1040,6 +1155,9 @@ app.put('/api/merchants/:id/toggle', async (req, res) => {
     res.json({ ok: true });
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
+
+// Hub de navigation
+app.get('/hub', (req, res) => res.sendFile(path.join(__dirname, 'public', 'hub.html')));
 
 // Catalogue Pro — page partageable par grossiste
 app.get('/catalogue/:id', (req, res) => res.sendFile(path.join(__dirname, 'public', 'catalogue.html')));
@@ -1127,7 +1245,7 @@ function planifierRelances() {
 
 initDB().then(() => {
   app.listen(process.env.PORT || 3000, () => {
-    console.log('🚀 MarchandPro v2.1 démarré sur port ' + (process.env.PORT || 3000));
+    console.log('🚀 MarchandPro v3.1 démarré sur port ' + (process.env.PORT || 3000));
     planifierRelances();
   });
 }).catch(err => console.error('Erreur démarrage:', err));
