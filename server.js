@@ -260,6 +260,48 @@ const SECTEURS = {
       { nom: 'Henné naturel', unite: 'kg', prix: 8000, mots: ['henne'] },
       { nom: 'Extensions cheveux', unite: 'lot 10 pièces', prix: 35000, mots: ['extension','cheveux','perruque'] },
     ]
+  },
+  cereales: {
+    nom: 'Céréales & Légumineuses',
+    emoji: '🌿',
+    catalogue: [
+      { nom: 'Niébé local', unite: 'sac 50kg', prix: 28000, mots: ['niebe','haricot'] },
+      { nom: 'Arachide décortiquée', unite: 'sac 50kg', prix: 35000, mots: ['arachide','cacahuete'] },
+      { nom: 'Mil local', unite: 'sac 50kg', prix: 18000, mots: ['mil'] },
+      { nom: 'Maïs grain', unite: 'sac 50kg', prix: 16000, mots: ['mais','maïs'] },
+      { nom: 'Sorgho', unite: 'sac 50kg', prix: 15000, mots: ['sorgho'] },
+      { nom: 'Bissap séché', unite: 'kg', prix: 4500, mots: ['bissap','hibiscus'] },
+      { nom: 'Sésame blanc', unite: 'kg', prix: 6000, mots: ['sesame'] },
+      { nom: 'Lentilles', unite: 'sac 25kg', prix: 22000, mots: ['lentille','lentilles'] },
+    ]
+  },
+  viande: {
+    nom: 'Viande & Volaille',
+    emoji: '🥩',
+    catalogue: [
+      { nom: 'Bœuf (demi-carcasse)', unite: 'kg', prix: 3500, mots: ['boeuf','vache','viande'] },
+      { nom: 'Mouton entier', unite: 'tête', prix: 85000, mots: ['mouton','belier'] },
+      { nom: 'Poulet de chair', unite: 'kg vif', prix: 2200, mots: ['poulet','volaille'] },
+      { nom: 'Poulet congelé', unite: 'carton 10kg', prix: 22000, mots: ['congele','congelé'] },
+      { nom: 'Agneau entier', unite: 'tête', prix: 65000, mots: ['agneau'] },
+      { nom: 'Abats bœuf', unite: 'kg', prix: 1800, mots: ['abats','foie','tripes'] },
+      { nom: 'Chèvre entière', unite: 'tête', prix: 45000, mots: ['chevre','chèvre'] },
+      { nom: 'Dinde', unite: 'pièce', prix: 18000, mots: ['dinde','dindon'] },
+    ]
+  },
+  emballage: {
+    nom: 'Emballage & Conditionnement',
+    emoji: '📦',
+    catalogue: [
+      { nom: 'Sachets plastiques 25kg', unite: 'lot 1000 pièces', prix: 12000, mots: ['sachet','plastique'] },
+      { nom: 'Cartons d\'expédition', unite: 'lot 50 pièces', prix: 18000, mots: ['carton','expedition'] },
+      { nom: 'Sacs kraft 5kg', unite: 'lot 500 pièces', prix: 22000, mots: ['kraft','sac'] },
+      { nom: 'Boîtes alimentaires', unite: 'lot 100 pièces', prix: 15000, mots: ['boite','alimentaire'] },
+      { nom: 'Film étirable', unite: 'rouleau 500m', prix: 25000, mots: ['film','etirable'] },
+      { nom: 'Ficelle emballage', unite: 'rouleau 1kg', prix: 4500, mots: ['ficelle','corde'] },
+      { nom: 'Étiquettes adhésives', unite: 'lot 1000 pièces', prix: 8000, mots: ['etiquette','adhesif'] },
+      { nom: 'Ruban adhésif', unite: 'lot 12 rouleaux', prix: 6000, mots: ['ruban','scotch','adhesif'] },
+    ]
   }
 };
 
@@ -1386,12 +1428,14 @@ app.get('/boutique/:slug', async (req, res) => {
   const SECTEUR_COLORS = {
     alimentaire: '#006633', menagers: '#1565C0', poisson: '#00838F',
     pharmacie: '#AD1457', quincaillerie: '#E65100', telephonie: '#4527A0',
-    textile: '#558B2F', cosmetiques: '#880E4F'
+    textile: '#558B2F', cosmetiques: '#880E4F',
+    cereales: '#5D4037', viande: '#B71C1C', emballage: '#37474F'
   };
   const SECTEUR_EMOJIS = {
     alimentaire:'🌾', menagers:'🧴', poisson:'🐟',
     pharmacie:'💊', quincaillerie:'🔧', telephonie:'📱',
-    textile:'👗', cosmetiques:'💄'
+    textile:'👗', cosmetiques:'💄',
+    cereales:'🌿', viande:'🥩', emballage:'📦'
   };
 
   const couleur = SECTEUR_COLORS[m.secteur] || '#006633';
@@ -1612,6 +1656,9 @@ input:focus, select:focus { border-color:#006633; }
     <button class="secteur-btn" onclick="selSecteur('menagers',this)"><span class="secteur-emoji">🧴</span>Ménagers</button>
     <button class="secteur-btn" onclick="selSecteur('poisson',this)"><span class="secteur-emoji">🐟</span>Poisson & Marée</button>
     <button class="secteur-btn" onclick="selSecteur('cosmetiques',this)"><span class="secteur-emoji">💄</span>Cosmétiques</button>
+    <button class="secteur-btn" onclick="selSecteur('cereales',this)"><span class="secteur-emoji">🌿</span>Céréales</button>
+    <button class="secteur-btn" onclick="selSecteur('viande',this)"><span class="secteur-emoji">🥩</span>Viande & Volaille</button>
+    <button class="secteur-btn" onclick="selSecteur('emballage',this)"><span class="secteur-emoji">📦</span>Emballage</button>
     <button class="secteur-btn" onclick="selSecteur('pharmacie',this)"><span class="secteur-emoji">💊</span>Pharmacie</button>
     <button class="secteur-btn" onclick="selSecteur('quincaillerie',this)"><span class="secteur-emoji">🔧</span>Quincaillerie</button>
     <button class="secteur-btn" onclick="selSecteur('telephonie',this)"><span class="secteur-emoji">📱</span>Téléphonie</button>
