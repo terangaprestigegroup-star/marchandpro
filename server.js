@@ -403,6 +403,7 @@ const clientMerchantMap = {};
 // Commandes en attente d'adresse de livraison
 const pendingAddress = {}; // phone -> { orderId, ref, total }
 const pendingRecurrent = {}; // phone -> { items, total, merchant_id }
+const pendingAvis = {}; // phone -> { orderId, merchantId, ref }
 
 async function getMerchantByClient(phone) {
   // 1. Vérifier en mémoire
@@ -781,6 +782,49 @@ app.post('/webhook/whatsapp', async (req, res) => {
         else {
 
           // ============================================
+          // AVIS CLIENT — après livraison
+          // ============================================
+          if (pendingAvis[phone]) {
+            const { orderId, merchantId, ref } = pendingAvis[phone];
+            let note = null;
+            if (['1', '⭐', 'mauvais', 'nul', 'pas bien'].includes(texte)) note = 1;
+            else if (['2', '3', 'correct', 'bien', 'moyen', 'ok', 'bof'].includes(texte)) note = 3;
+            else if (['3', '4', '5', 'excellent', 'parfait', 'super', 'top', 'très bien', 'tres bien', 'bravo'].includes(texte)) note = 5;
+
+            if (note !== null) {
+              delete pendingAvis[phone];
+              const etoiles = '⭐'.repeat(note);
+              // Sauvegarder l'avis
+              await pool.query(
+                `UPDATE orders SET items = items || jsonb_build_object('avis', $1, 'note', $2) WHERE id=$3`,
+                [texte, note, orderId]
+              );
+              await envoyerWhatsApp(phone_id, phone,
+                `${etoiles} *Merci pour votre avis !*\n\n` +
+                `Votre retour nous aide à améliorer notre service 🙏\n\n` +
+                `À très bientôt chez nous ! 🇸🇳`
+              );
+              // Notifier le grossiste
+              try {
+                const mRes = await pool.query('SELECT * FROM merchants WHERE id=$1', [merchantId]);
+                if (mRes.rows[0]?.whatsapp) {
+                  await envoyerWhatsApp(phone_id, mRes.rows[0].whatsapp,
+                    `⭐ *Nouvel avis client !*\n\n` +
+                    `Commande : *${ref}*\n` +
+                    `Note : *${etoiles} (${note}/5)*\n` +
+                    `Client : ${phone}`
+                  );
+                }
+              } catch(e) {}
+            } else {
+              await envoyerWhatsApp(phone_id, phone,
+                `❓ Tapez :\n1️⃣ pour Mauvais\n2️⃣ pour Correct\n3️⃣ pour Excellent`
+              );
+            }
+            return res.sendStatus(200);
+          }
+
+          // ============================================
           // COMMANDE RÉCURRENTE — "commande habituelle"
           // ============================================
           const motsCles = ['habituelle','comme d\'habitude','comme la derniere','comme avant','meme chose','même chose','recommande','re-commande','renouveler','habituel','habituel','encore pareil'];
@@ -1023,8 +1067,34 @@ app.get('/api/orders', authMiddleware, async (req, res) => {
 app.put('/api/orders/:id', authMiddleware, async (req, res) => {
   const { status } = req.body;
   const result = await pool.query('UPDATE orders SET status=$1 WHERE id=$2 RETURNING *', [status, req.params.id]);
-  res.json(result.rows[0]);
+  const order = result.rows[0];
+
+  // ── AVIS CLIENT — Envoi automatique quand statut = "livré"
+  if (status === 'livré' && order) {
+    try {
+      const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+      const merchantRes = await pool.query('SELECT * FROM merchants WHERE id=$1', [order.merchant_id]);
+      const merchant = merchantRes.rows[0];
+      if (merchant && order.customer_phone) {
+        // Marquer commande en attente d'avis
+        pendingAvis[order.customer_phone] = { orderId: order.id, merchantId: order.merchant_id, ref: order.reference };
+        setTimeout(async () => {
+          try {
+            await envoyerWhatsApp(PHONE_NUMBER_ID, order.customer_phone,
+              `✅ *Votre commande ${order.reference} a été livrée !*\n\n` +
+              `Merci d'avoir commandé chez *${merchant.nom_boutique}* 🙏\n\n` +
+              `⭐ Comment s'est passée votre livraison ?\n\n` +
+              `1️⃣ ⭐ Mauvais\n2️⃣ ⭐⭐⭐ Correct\n3️⃣ ⭐⭐⭐⭐⭐ Excellent !`
+            );
+          } catch(e) { console.error('Erreur envoi demande avis:', e.message); }
+        }, 2000);
+      }
+    } catch(e) { console.error('Erreur avis livraison:', e.message); }
+  }
+
+  res.json(order);
 });
+
 
 app.get('/api/clients', authMiddleware, async (req, res) => {
   const result = await pool.query('SELECT * FROM clients ORDER BY total_orders DESC');
@@ -2072,8 +2142,153 @@ app.get('/api/relances', async (req, res) => {
 });
 
 // ============================================
-// PROMOTIONS FLASH — Broadcast à tous les clients
+// BILAN MENSUEL PDF
 // ============================================
+app.get('/api/bilan/:merchant_id', authMiddleware, async (req, res) => {
+  try {
+    const { merchant_id } = req.params;
+    const { mois, annee } = req.query;
+    const now = new Date();
+    const m = parseInt(mois) || now.getMonth() + 1;
+    const a = parseInt(annee) || now.getFullYear();
+    const debut = new Date(a, m - 1, 1);
+    const fin = new Date(a, m, 0, 23, 59, 59);
+
+    const merchantRes = await pool.query('SELECT * FROM merchants WHERE id=$1', [merchant_id]);
+    if (!merchantRes.rows[0]) return res.status(404).json({ error: 'Merchant introuvable' });
+    const merchant = merchantRes.rows[0];
+
+    const ordersRes = await pool.query(
+      `SELECT * FROM orders WHERE merchant_id=$1 AND created_at BETWEEN $2 AND $3 ORDER BY created_at DESC`,
+      [merchant_id, debut, fin]
+    );
+    const orders = ordersRes.rows;
+
+    const totalRevenu = orders.reduce((s, o) => s + Number(o.total || 0), 0);
+    const nbCommandes = orders.length;
+    const clients = new Set(orders.map(o => o.customer_phone).filter(Boolean)).size;
+    const nbLivres = orders.filter(o => o.status === 'livré').length;
+    const nbNouveaux = orders.filter(o => o.status === 'nouveau').length;
+    const nbAnnules = orders.filter(o => o.status === 'annulé').length;
+
+    const moisNoms = ['','Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Bilan ${moisNoms[m]} ${a} — ${merchant.nom_boutique}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'DM Sans',Arial,sans-serif;color:#0d1f0d;background:white;padding:40px 32px}
+  .header{background:linear-gradient(135deg,#004d26,#006633);color:white;border-radius:16px;padding:32px;margin-bottom:32px;display:flex;align-items:center;justify-content:space-between}
+  .header-left h1{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;margin-bottom:4px}
+  .header-left p{opacity:0.8;font-size:14px}
+  .header-right{text-align:right}
+  .header-right .periode{font-size:20px;font-weight:800;color:#FFD700}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px}
+  .kpi{background:#f4f6f4;border-radius:12px;padding:20px;border-left:4px solid #006633}
+  .kpi-val{font-family:'Syne',sans-serif;font-size:32px;font-weight:800;color:#006633}
+  .kpi-label{font-size:13px;color:#5a7a5a;margin-top:4px}
+  .kpi.or{border-left-color:#FFD700}
+  .kpi.or .kpi-val{color:#cc9900}
+  table{width:100%;border-collapse:collapse;margin-bottom:32px}
+  th{background:#006633;color:white;padding:12px 14px;font-size:13px;text-align:left;font-weight:700}
+  td{padding:10px 14px;font-size:13px;border-bottom:1px solid #e8f5e9}
+  tr:nth-child(even){background:#f9fdf9}
+  .badge{display:inline-block;padding:3px 10px;border-radius:50px;font-size:11px;font-weight:700}
+  .badge-livr{background:#e8f5e9;color:#006633}
+  .badge-new{background:#e3f2fd;color:#1565C0}
+  .badge-ann{background:#fce4ec;color:#c0392b}
+  .badge-autre{background:#fff9e6;color:#cc9900}
+  .footer{text-align:center;color:#5a7a5a;font-size:12px;margin-top:32px;padding-top:16px;border-top:1px solid #e8f5e9}
+  .section-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;margin-bottom:16px;color:#006633}
+  @media print{body{padding:20px}button{display:none}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-left">
+    <h1>🛒 ${merchant.nom_boutique}</h1>
+    <p>Bilan mensuel · MarchandPro 🇸🇳</p>
+  </div>
+  <div class="header-right">
+    <div class="periode">${moisNoms[m]} ${a}</div>
+    <div style="font-size:13px;opacity:0.8;margin-top:4px">Généré le ${new Date().toLocaleDateString('fr-FR')}</div>
+  </div>
+</div>
+
+<div class="kpis">
+  <div class="kpi or">
+    <div class="kpi-val">${totalRevenu.toLocaleString('fr-FR')} F</div>
+    <div class="kpi-label">💰 Revenus du mois</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-val">${nbCommandes}</div>
+    <div class="kpi-label">📋 Commandes totales</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-val">${clients}</div>
+    <div class="kpi-label">👥 Clients actifs</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-val">${nbLivres}</div>
+    <div class="kpi-label">✅ Commandes livrées</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-val">${nbNouveaux}</div>
+    <div class="kpi-label">⏳ En attente</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-val">${nbAnnules}</div>
+    <div class="kpi-label">❌ Annulées</div>
+  </div>
+</div>
+
+<div class="section-title">📋 Détail des commandes</div>
+<table>
+  <thead>
+    <tr><th>Référence</th><th>Client</th><th>Produits</th><th>Total</th><th>Statut</th><th>Date</th></tr>
+  </thead>
+  <tbody>
+    ${orders.length === 0 ? '<tr><td colspan="6" style="text-align:center;padding:24px;color:#5a7a5a">Aucune commande ce mois</td></tr>' :
+      orders.map(o => {
+        const items = Array.isArray(o.items) ? o.items : [];
+        const produitsStr = items.filter(i => i.produit).map(i => `${i.quantite}x ${i.produit}`).join(', ') || '—';
+        const badgeClass = o.status === 'livré' ? 'badge-livr' : o.status === 'annulé' ? 'badge-ann' : o.status === 'nouveau' ? 'badge-new' : 'badge-autre';
+        return `<tr>
+          <td><b>${o.reference || 'CMD-' + String(o.id).padStart(4,'0')}</b></td>
+          <td>${o.customer_phone || '—'}</td>
+          <td style="max-width:200px">${produitsStr}</td>
+          <td><b>${Number(o.total||0).toLocaleString('fr-FR')} F</b></td>
+          <td><span class="badge ${badgeClass}">${o.status?.toUpperCase()}</span></td>
+          <td>${new Date(o.created_at).toLocaleDateString('fr-FR')}</td>
+        </tr>`;
+      }).join('')
+    }
+  </tbody>
+</table>
+
+<div class="footer">
+  <p>🛒 MarchandPro · La solution digitale pour les grossistes sénégalais 🇸🇳</p>
+  <p style="margin-top:4px">marchandpro-production-b529.up.railway.app · +221 71 128 84 39</p>
+</div>
+
+<div style="text-align:center;margin-top:24px">
+  <button onclick="window.print()" style="background:#006633;color:white;border:none;padding:14px 32px;border-radius:50px;font-size:15px;font-weight:800;cursor:pointer">🖨️ Imprimer / Sauvegarder en PDF</button>
+</div>
+</body>
+</html>`;
+
+    res.send(html);
+  } catch(e) {
+    console.error('Erreur bilan:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
 app.post('/api/promo', authMiddleware, async (req, res) => {
   try {
     const { merchant_id, message, produit, remise } = req.body;
