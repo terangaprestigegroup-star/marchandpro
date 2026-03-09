@@ -2164,8 +2164,8 @@ app.get('/api/bilan/:merchant_id', async (req, res) => {
     );
     const orders = ordersRes.rows;
 
-    const totalRevenu = orders.reduce((s, o) => s + Number(o.total || 0), 0);
-    const nbCommandes = orders.length;
+    const totalRevenu = orders.filter(o => Number(o.total) > 0).reduce((s, o) => s + Number(o.total || 0), 0);
+    const nbCommandes = orders.filter(o => Number(o.total) > 0).length;
     const clients = new Set(orders.map(o => o.customer_phone).filter(Boolean)).size;
     const nbLivres = orders.filter(o => o.status === 'livré').length;
     const nbNouveaux = orders.filter(o => o.status === 'nouveau').length;
@@ -2254,14 +2254,16 @@ app.get('/api/bilan/:merchant_id', async (req, res) => {
   <tbody>
     ${orders.length === 0 ? '<tr><td colspan="6" style="text-align:center;padding:24px;color:#5a7a5a">Aucune commande ce mois</td></tr>' :
       orders.map(o => {
+        const phoneClean = (o.customer_phone || '—').replace('whatsapp:+', '+').replace('whatsapp:', '');
         const items = Array.isArray(o.items) ? o.items : [];
-        const produitsStr = items.filter(i => i.produit).map(i => `${i.quantite}x ${i.produit}`).join(', ') || '—';
+        const produitsStr = items.filter(i => i.produit && i.produit.length > 2).map(i => `${i.quantite}x ${i.produit}`).join(', ') || '—';
         const badgeClass = o.status === 'livré' ? 'badge-livr' : o.status === 'annulé' ? 'badge-ann' : o.status === 'nouveau' ? 'badge-new' : 'badge-autre';
+        const totalVal = Number(o.total || 0);
         return `<tr>
           <td><b>${o.reference || 'CMD-' + String(o.id).padStart(4,'0')}</b></td>
-          <td>${o.customer_phone || '—'}</td>
+          <td>${phoneClean}</td>
           <td style="max-width:200px">${produitsStr}</td>
-          <td><b>${Number(o.total||0).toLocaleString('fr-FR')} F</b></td>
+          <td><b>${totalVal > 0 ? totalVal.toLocaleString('fr-FR') + ' F' : '<span style="color:#999">—</span>'}</b></td>
           <td><span class="badge ${badgeClass}">${o.status?.toUpperCase()}</span></td>
           <td>${new Date(o.created_at).toLocaleDateString('fr-FR')}</td>
         </tr>`;
