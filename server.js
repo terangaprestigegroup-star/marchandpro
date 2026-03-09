@@ -2434,17 +2434,7 @@ function planifierRelances() {
 // ============================================
 // CARTE DES GROSSISTES
 // ============================================
-app.get('/carte', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT id, nom_boutique, ville, secteur FROM merchants ORDER BY id');
-    const rows = result.rows.map(m => ({
-      ...m,
-      secteur: m.secteur || 'alimentaire',
-      ville: m.ville || 'Dakar'
-    }));
-    res.sendFile(path.join(__dirname, 'public', 'carte.html'));
-  } catch(e) { res.status(500).send('Erreur serveur'); }
-});
+app.get('/carte', (req, res) => res.sendFile(path.join(__dirname, 'public', 'carte.html')));
 
 app.get('/api/merchants-public', async (req, res) => {
   try {
