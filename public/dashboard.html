@@ -722,9 +722,15 @@ function renderCommandes(commandes) {
                 .map(it=>`${getEmoji(it.produit)} ${it.quantite}x ${it.produit}`).join('<br>')}
             </td>
             <td><span class="montant">${formatFCFA(cmd.total)}</span></td>
-            <td><span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;font-size:12px;font-weight:700;${getStatutStyle(cmd.status)}">
-              ${getStatutEmoji(cmd.status)} ${cmd.status}
-            </span></td>
+            <td>
+              <select onchange="changerStatut(${cmd.id}, this.value)" style="border:2px solid #e8f5e9;border-radius:8px;padding:5px 8px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;background:white;color:#0d1f0d">
+                <option value="nouveau" ${cmd.status==='nouveau'?'selected':''}>🕐 Nouveau</option>
+                <option value="confirmé" ${cmd.status==='confirmé'?'selected':''}>✅ Confirmé</option>
+                <option value="en route" ${cmd.status==='en route'?'selected':''}>🚚 En route</option>
+                <option value="livré" ${cmd.status==='livré'?'selected':''}>📦 Livré</option>
+                <option value="annulé" ${cmd.status==='annulé'?'selected':''}>❌ Annulé</option>
+              </select>
+            </td>
             <td style="font-size:12px;color:var(--texte-light)">${formatDate(cmd.created_at)}</td>
             <td><a href="${API}/api/facture/${cmd.id}" target="_blank"
               style="display:inline-block;background:var(--vert-clair);color:var(--vert);padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;border:1px solid var(--vert)">
@@ -873,6 +879,24 @@ function voirBilan() {
   const mid = urlParams.get('merchant_id') || 1;
   const tok = urlParams.get('token') || '';
   window.open(`${API}/api/bilan/${mid}?mois=${mois}&annee=${annee}&token=${tok}`, '_blank');
+}
+
+// ── CHANGER STATUT COMMANDE ──
+async function changerStatut(id, statut) {
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tok = urlParams.get('token') || '';
+    const r = await fetch(`${API}/api/orders/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+      body: JSON.stringify({ status: statut })
+    });
+    if (r.ok) {
+      toast(`✅ Statut mis à jour : ${statut}`);
+    } else {
+      toast('❌ Erreur mise à jour statut');
+    }
+  } catch(e) { toast('❌ Erreur: ' + e.message); }
 }
 
 loadDashboard();
