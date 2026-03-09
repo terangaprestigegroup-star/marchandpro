@@ -2431,170 +2431,18 @@ function planifierRelances() {
 // ============================================
 // CARTE DES GROSSISTES
 // ============================================
-app.get('/carte', async (req, res) => {
+// ============================================
+// CARTE DES GROSSISTES
+// ============================================
+app.get('/carte', (req, res) => res.sendFile(path.join(__dirname, 'public', 'carte.html')));
+
+app.get('/api/merchants-public', async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, nom_boutique, proprietaire, ville, secteur FROM merchants WHERE actif=true ORDER BY id');
-    const merchants = result.rows;
-
-    const COORDS = {
-      'dakar':{'lat':14.6937,'lng':-17.4441},'médina':{'lat':14.6919,'lng':-17.4478},
-      'medina':{'lat':14.6919,'lng':-17.4478},'plateau':{'lat':14.6928,'lng':-17.4467},
-      'sandaga':{'lat':14.6931,'lng':-17.4456},'hlm':{'lat':14.7089,'lng':-17.4567},
-      'parcelles assainies':{'lat':14.7789,'lng':-17.4234},'parcelles':{'lat':14.7789,'lng':-17.4234},
-      'colobane':{'lat':14.6978,'lng':-17.4512},'mermoz':{'lat':14.7034,'lng':-17.4712},
-      'pikine':{'lat':14.7456,'lng':-17.3923},'guédiawaye':{'lat':14.7789,'lng':-17.3867},
-      'guediawaye':{'lat':14.7789,'lng':-17.3867},'rufisque':{'lat':14.7156,'lng':-17.2734},
-      'thiès':{'lat':14.7910,'lng':-16.9256},'thies':{'lat':14.7910,'lng':-16.9256},
-      'touba':{'lat':14.8567,'lng':-15.8834},'kaolack':{'lat':14.1512,'lng':-16.0726},
-    };
-    const COLORS = {
-      alimentaire:'#006633',menagers:'#1565C0',poisson:'#00838F',pharmacie:'#AD1457',
-      quincaillerie:'#E65100',telephonie:'#4527A0',textile:'#558B2F',cosmetiques:'#880E4F',
-      cereales:'#5D4037',viande:'#B71C1C',emballage:'#37474F'
-    };
-    const EMOJIS = {
-      alimentaire:'🌾',menagers:'🧴',poisson:'🐟',pharmacie:'💊',quincaillerie:'🔧',
-      telephonie:'📱',textile:'👗',cosmetiques:'💄',cereales:'🌿',viande:'🥩',emballage:'📦'
-    };
-
-    const geo = merchants.map((m,i) => {
-      const key = (m.ville||'dakar').toLowerCase().trim();
-      const c = COORDS[key] || COORDS['dakar'];
-      return { ...m, lat: c.lat+(Math.sin(i*1.5)*i*0.002), lng: c.lng+(Math.cos(i*1.5)*i*0.002),
-        couleur: COLORS[m.secteur]||'#006633', emoji: EMOJIS[m.secteur]||'🛒' };
-    });
-
-    const secteurs = [...new Set(merchants.map(m=>m.secteur).filter(Boolean))];
-
-    res.send(`<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Carte Grossistes — MarchandPro 🇸🇳</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@800&family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'DM Sans',sans-serif;background:#f4f6f4;overflow:hidden}
-.header{background:linear-gradient(135deg,#004d26,#006633);color:white;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:fixed;top:0;left:0;right:0;z-index:200}
-.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:17px}
-.count{background:rgba(255,255,255,0.2);padding:5px 12px;border-radius:50px;font-size:12px;font-weight:700}
-.filters{position:fixed;top:54px;left:0;right:0;z-index:150;background:white;padding:10px 14px;display:flex;gap:8px;overflow-x:auto;border-bottom:2px solid #e8f5e9;scrollbar-width:none}
-.filters::-webkit-scrollbar{display:none}
-.f-btn{flex-shrink:0;background:#f4f6f4;border:2px solid transparent;color:#0d1f0d;padding:6px 13px;border-radius:50px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all 0.2s;white-space:nowrap}
-.f-btn.active{background:#e8f5e9;border-color:#006633;color:#006633}
-#map{position:fixed;top:110px;left:0;right:0;bottom:72px}
-.bottom-bar{position:fixed;bottom:0;left:0;right:0;background:white;border-top:2px solid #e8f5e9;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;z-index:200}
-.bottom-title{font-weight:700;font-size:14px}
-.btn-list{background:#006633;color:white;border:none;padding:9px 18px;border-radius:50px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
-.drawer{position:fixed;bottom:0;left:0;right:0;background:white;border-radius:20px 20px 0 0;padding:16px;max-height:60vh;overflow-y:auto;z-index:300;transform:translateY(100%);transition:transform 0.3s;box-shadow:0 -8px 32px rgba(0,0,0,0.15)}
-.drawer.open{transform:translateY(0)}
-.handle{width:40px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 16px;cursor:pointer}
-.drawer-title{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;margin-bottom:14px}
-.m-card{display:flex;align-items:center;gap:12px;padding:12px;background:#f4f6f4;border-radius:12px;margin-bottom:10px;cursor:pointer;transition:all 0.2s;text-decoration:none;color:inherit}
-.m-card:hover{background:#e8f5e9}
-.m-av{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
-.m-nom{font-weight:700;font-size:13px;margin-bottom:2px}
-.m-meta{font-size:11px;color:#5a7a5a}
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:250;display:none}
-.overlay.show{display:block}
-</style>
-</head>
-<body>
-<div class="header">
-  <div class="logo">🗺️ Grossistes MarchandPro</div>
-  <div class="count" id="cnt">${merchants.length} grossiste${merchants.length>1?'s':''}</div>
-</div>
-
-<div class="filters">
-  <button class="f-btn active" onclick="filtrer('tous',this)">🗺️ Tous</button>
-  ${secteurs.map(s=>`<button class="f-btn" onclick="filtrer('${s}',this)">${EMOJIS[s]||'🛒'} ${s.charAt(0).toUpperCase()+s.slice(1)}</button>`).join('')}
-</div>
-
-<div id="map"></div>
-
-<div class="bottom-bar">
-  <div class="bottom-title" id="bottom-txt">📍 ${merchants.length} grossiste${merchants.length>1?'s':''} sur la carte</div>
-  <button class="btn-list" onclick="openDrawer()">📋 Liste</button>
-</div>
-
-<div class="overlay" id="overlay" onclick="closeDrawer()"></div>
-<div class="drawer" id="drawer">
-  <div class="handle" onclick="closeDrawer()"></div>
-  <div class="drawer-title">📍 Tous les grossistes</div>
-  <div id="drawer-list">
-    ${geo.map(m=>`
-    <a href="/boutique/${m.id}" class="m-card" data-secteur="${m.secteur||''}">
-      <div class="m-av" style="background:${m.couleur}22">${m.emoji}</div>
-      <div>
-        <div class="m-nom">${m.nom_boutique}</div>
-        <div class="m-meta">📍 ${m.ville} · ${m.emoji} ${m.secteur||'Général'}</div>
-      </div>
-      <span style="margin-left:auto;color:#5a7a5a">→</span>
-    </a>`).join('')}
-  </div>
-</div>
-
-<script>
-const MERCHANTS = ${JSON.stringify(geo)};
-let map, markers=[], infoWindow;
-
-function initMap(){
-  map = new google.maps.Map(document.getElementById('map'),{
-    center:{lat:14.72,lng:-17.44},zoom:12,
-    styles:[{featureType:'poi',elementType:'labels',stylers:[{visibility:'off'}]}],
-    mapTypeControl:false,streetViewControl:false,fullscreenControl:false
-  });
-  infoWindow = new google.maps.InfoWindow();
-
-  MERCHANTS.forEach(m=>{
-    const marker = new google.maps.Marker({
-      position:{lat:m.lat,lng:m.lng},map,title:m.nom_boutique,
-      icon:{path:google.maps.SymbolPath.CIRCLE,fillColor:m.couleur,fillOpacity:1,strokeColor:'white',strokeWeight:2.5,scale:16},
-      label:{text:m.emoji,fontSize:'13px'},
-      secteur:m.secteur||''
-    });
-    marker.addListener('click',()=>{
-      infoWindow.setContent(\`<div style="font-family:'DM Sans',sans-serif;padding:8px;min-width:190px">
-        <div style="font-size:18px;margin-bottom:6px">\${m.emoji}</div>
-        <div style="font-weight:800;font-size:14px;margin-bottom:3px">\${m.nom_boutique}</div>
-        <div style="font-size:11px;color:#5a7a5a;margin-bottom:10px">📍 \${m.ville} · \${m.secteur||'Général'}</div>
-        <a href="/boutique/\${m.id}" style="display:block;background:\${m.couleur};color:white;padding:8px;border-radius:8px;text-decoration:none;font-weight:700;font-size:12px;text-align:center;margin-bottom:6px">Voir la boutique →</a>
-        <a href="https://wa.me/221711288439?text=Bonjour+\${encodeURIComponent(m.nom_boutique)}+!" target="_blank" style="display:block;background:#25D366;color:white;padding:8px;border-radius:8px;text-decoration:none;font-weight:700;font-size:12px;text-align:center">📲 Commander</a>
-      </div>\`);
-      infoWindow.open(map,marker);
-    });
-    markers.push(marker);
-  });
-}
-
-function filtrer(secteur,btn){
-  document.querySelectorAll('.f-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  let count=0;
-  markers.forEach((mk,i)=>{
-    const visible=secteur==='tous'||MERCHANTS[i].secteur===secteur;
-    mk.setVisible(visible);
-    if(visible) count++;
-  });
-  document.querySelectorAll('.m-card').forEach(c=>{
-    c.style.display=(secteur==='tous'||c.dataset.secteur===secteur)?'flex':'none';
-  });
-  document.getElementById('cnt').textContent=count+' grossiste'+(count>1?'s':'');
-  document.getElementById('bottom-txt').textContent='📍 '+count+' grossiste'+(count>1?'s':'')+' sur la carte';
-}
-
-function openDrawer(){
-  document.getElementById('drawer').classList.add('open');
-  document.getElementById('overlay').classList.add('show');
-}
-function closeDrawer(){
-  document.getElementById('drawer').classList.remove('open');
-  document.getElementById('overlay').classList.remove('show');
-}
-</script>
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY&callback=initMap&language=fr" async defer></script>
-</body></html>`);
-  } catch(e){ console.error('Erreur carte:',e); res.status(500).send('Erreur serveur'); }
+    const result = await pool.query(
+      'SELECT id, nom_boutique, ville, secteur FROM merchants WHERE actif=true ORDER BY id'
+    );
+    res.json(result.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 initDB().then(() => {
