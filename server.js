@@ -402,6 +402,7 @@ app.get('/webhook/whatsapp', (req, res) => {
 const clientMerchantMap = {};
 // Commandes en attente d'adresse de livraison
 const pendingAddress = {}; // phone -> { orderId, ref, total }
+const pendingRecurrent = {}; // phone -> { items, total, merchant_id }
 
 async function getMerchantByClient(phone) {
   // 1. Vérifier en mémoire
@@ -660,6 +661,82 @@ app.post('/webhook/whatsapp', async (req, res) => {
         }
         // Groq AI + Parser commande
         else {
+
+          // ============================================
+          // COMMANDE RÉCURRENTE — "commande habituelle"
+          // ============================================
+          const motsCles = ['habituelle','comme d\'habitude','comme la derniere','comme avant','meme chose','même chose','recommande','re-commande','renouveler','habituel','habituel','encore pareil'];
+          const isHabituelle = motsCles.some(m => texte.includes(m)) || texte === 'habituelle' || texte === 'récurrente';
+
+          if (isHabituelle) {
+            // Retrouver la dernière commande du client
+            const lastOrder = await pool.query(
+              `SELECT * FROM orders WHERE customer_phone=$1 AND merchant_id=$2 AND status NOT IN ('annulé') ORDER BY created_at DESC LIMIT 1`,
+              [phone, merchant.id]
+            );
+            if (!lastOrder.rows[0]) {
+              await envoyerWhatsApp(phone_id, phone,
+                `😊 Vous n'avez pas encore de commande précédente.\n\nTapez *catalogue* pour voir nos produits et passer votre première commande !`
+              );
+            } else {
+              const derniere = lastOrder.rows[0];
+              const items = Array.isArray(derniere.items) ? derniere.items : [];
+              const lignes = items.filter(i => i.produit).map(i => `• ${i.quantite} ${i.unite || ''} de *${i.produit}* — ${Number(i.total || 0).toLocaleString('fr-FR')} FCFA`).join('\n');
+              const total = Number(derniere.total);
+
+              // Sauvegarder en attente de confirmation
+              pendingRecurrent[phone] = { items, total, merchant_id: merchant.id };
+
+              await envoyerWhatsApp(phone_id, phone,
+                `🔄 *Votre commande habituelle :*\n\n${lignes}\n\n💰 *Total : ${total.toLocaleString('fr-FR')} FCFA*\n\n` +
+                `Tapez *OUI* pour confirmer cette commande\nTapez *NON* pour annuler`
+              );
+            }
+            return res.sendStatus(200);
+          }
+
+          // Confirmation commande récurrente
+          if (pendingRecurrent[phone]) {
+            if (['oui','yes','ok','confirme','confirmer','yep','ouai','ouais'].includes(texte)) {
+              const { items, total, merchant_id } = pendingRecurrent[phone];
+              delete pendingRecurrent[phone];
+
+              const count = await pool.query('SELECT COUNT(*) FROM orders');
+              const ref = `CMD-${String(parseInt(count.rows[0].count) + 1).padStart(4,'0')}`;
+
+              await pool.query(
+                'INSERT INTO orders (merchant_id, customer_phone, items, total, status, reference) VALUES ($1,$2,$3,$4,$5,$6)',
+                [merchant_id, phone, JSON.stringify(items), total, 'nouveau', ref]
+              );
+
+              const orderId = (await pool.query('SELECT id FROM orders WHERE reference=$1', [ref])).rows[0]?.id;
+              if (orderId) pendingAddress[phone] = { orderId, ref, total };
+
+              const lignes = items.filter(i => i.produit).map(i => `• ${i.quantite} ${i.unite || ''} de *${i.produit}*`).join('\n');
+              await envoyerWhatsApp(phone_id, phone,
+                `✅ *Commande habituelle confirmée !*\n\n${lignes}\n\n💰 *Total : ${total.toLocaleString('fr-FR')} FCFA*\n📋 Réf : *${ref}*\n\n📍 À quelle adresse souhaitez-vous être livré ?`
+              );
+
+              // Notifier le grossiste
+              try {
+                await envoyerWhatsApp(phone_id, merchant.whatsapp,
+                  `🔄 *Commande habituelle reçue !*\n\n` +
+                  `👤 Client : ${phone}\n${lignes}\n💰 Total : *${total.toLocaleString('fr-FR')} FCFA*\n📋 Réf : *${ref}*`
+                );
+              } catch(e) {}
+
+            } else if (['non','no','annule','annuler','nope'].includes(texte)) {
+              delete pendingRecurrent[phone];
+              await envoyerWhatsApp(phone_id, phone,
+                `❌ Commande annulée.\n\nTapez *catalogue* pour voir nos produits ou *commander* pour passer une nouvelle commande. 😊`
+              );
+            } else {
+              await envoyerWhatsApp(phone_id, phone,
+                `❓ Tapez *OUI* pour confirmer votre commande habituelle ou *NON* pour annuler.`
+              );
+            }
+            return res.sendStatus(200);
+          }
 
           // Si client en attente d'adresse de livraison
           if (pendingAddress[phone]) {
