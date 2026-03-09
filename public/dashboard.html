@@ -413,11 +413,11 @@
       <div class="page-title">Tableau de bord</div>
       <div class="page-subtitle" id="last-update">Chargement...</div>
     </div>
-    <button class="refresh-btn" onclick="loadDashboard()">
-      🔄 Actualiser
-    </button>
+    <div style="display:flex;gap:10px">
+      <button onclick="voirBilan()" style="background:#1565C0;color:white;border:none;padding:10px 18px;border-radius:50px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📊 Bilan</button>
+      <button class="refresh-btn" onclick="loadDashboard()">🔄 Actualiser</button>
+    </div>
   </div>
-
   <!-- WhatsApp Status -->
   <div class="whatsapp-card">
     <div class="wa-info">
@@ -862,6 +862,17 @@ async function envoyerPromo() {
     btn.textContent = '📣 Envoyer la promotion';
     btn.disabled = false;
   }
+}
+
+// ── BILAN MENSUEL ──
+function voirBilan() {
+  const now = new Date();
+  const mois = now.getMonth() + 1;
+  const annee = now.getFullYear();
+  const urlParams = new URLSearchParams(window.location.search);
+  const mid = urlParams.get('merchant_id') || 1;
+  const tok = urlParams.get('token') || '';
+  window.open(`${API}/api/bilan/${mid}?mois=${mois}&annee=${annee}&token=${tok}`, '_blank');
 }
 
 loadDashboard();
