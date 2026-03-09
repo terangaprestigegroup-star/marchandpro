@@ -2438,13 +2438,14 @@ app.get('/carte', (req, res) => res.sendFile(path.join(__dirname, 'public', 'car
 
 app.get('/api/merchants-public', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM merchants LIMIT 1');
-    const cols = result.fields.map(f => f.name);
-    // Maintenant fetch proprement
-    const secteurCol = cols.includes('secteur') ? 'secteur' : cols.includes('type_commerce') ? 'type_commerce' : 'null as secteur';
-    const villeCol = cols.includes('ville') ? 'ville' : 'null as ville';
-    const data = await pool.query(`SELECT id, nom_boutique, ${villeCol}, ${secteurCol} FROM merchants ORDER BY id`);
-    res.json(data.rows);
+    const data = await pool.query('SELECT id, nom_boutique, ville, secteur FROM merchants ORDER BY id');
+    // Ajouter secteur par défaut si null
+    const rows = data.rows.map(m => ({
+      ...m,
+      secteur: m.secteur || 'alimentaire',
+      ville: m.ville || 'Dakar'
+    }));
+    res.json(rows);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
