@@ -2071,6 +2071,69 @@ app.get('/api/relances', async (req, res) => {
   res.json({ ok: true, message: `${envoyes} relance(s) envoyée(s) !` });
 });
 
+// ============================================
+// PROMOTIONS FLASH — Broadcast à tous les clients
+// ============================================
+app.post('/api/promo', authMiddleware, async (req, res) => {
+  try {
+    const { merchant_id, message, produit, remise } = req.body;
+    if (!merchant_id || !message) return res.status(400).json({ error: 'merchant_id et message requis' });
+
+    // Récupérer le merchant
+    const merchantRes = await pool.query('SELECT * FROM merchants WHERE id=$1 AND actif=true', [merchant_id]);
+    if (!merchantRes.rows[0]) return res.status(404).json({ error: 'Merchant introuvable' });
+    const merchant = merchantRes.rows[0];
+
+    // Récupérer tous les clients uniques du merchant
+    const clientsRes = await pool.query(
+      `SELECT DISTINCT customer_phone FROM orders WHERE merchant_id=$1 AND customer_phone IS NOT NULL`,
+      [merchant_id]
+    );
+    const clients = clientsRes.rows.map(r => r.customer_phone);
+
+    if (clients.length === 0) return res.json({ ok: true, envoyes: 0, message: 'Aucun client à contacter' });
+
+    const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+    const catalogueUrl = `https://marchandpro-production-b529.up.railway.app/catalogue/${merchant_id}`;
+
+    // Construire le message promo
+    const remiseText = remise ? `\n🎁 *Remise spéciale : -${remise}%* aujourd'hui seulement !` : '';
+    const produitText = produit ? `\n📦 Produit : *${produit}*` : '';
+    const promoMsg =
+      `🏷️ *PROMOTION FLASH chez ${merchant.nom_boutique}* 🇸🇳\n\n` +
+      `${message}${produitText}${remiseText}\n\n` +
+      `⏰ Offre limitée — commandez maintenant !\n\n` +
+      `👉 Voir le catalogue : ${catalogueUrl}\n` +
+      `💬 Ou tapez *commander* pour passer votre commande directement`;
+
+    // Envoyer à tous les clients
+    let envoyes = 0;
+    for (const phone of clients) {
+      try {
+        await envoyerWhatsApp(PHONE_NUMBER_ID, phone, promoMsg);
+        envoyes++;
+        // Pause entre envois pour éviter le spam Meta
+        await new Promise(r => setTimeout(r, 500));
+      } catch(e) {
+        console.error(`Erreur promo client ${phone}:`, e.message);
+      }
+    }
+
+    console.log(`📣 Promo envoyée à ${envoyes}/${clients.length} clients de ${merchant.nom_boutique}`);
+    res.json({
+      ok: true,
+      envoyes,
+      total_clients: clients.length,
+      message: `Promotion envoyée à ${envoyes} client(s) !`
+    });
+  } catch(e) {
+    console.error('Erreur promo:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
+
 // Lancer les relances tous les jours à 9h du matin
 function planifierRelances() {
   const maintenant = new Date();
