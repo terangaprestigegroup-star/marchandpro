@@ -2439,7 +2439,7 @@ app.get('/carte', (req, res) => res.sendFile(path.join(__dirname, 'public', 'car
 app.get('/api/merchants-public', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, nom_boutique, ville, secteur FROM merchants WHERE actif=true ORDER BY id'
+      'SELECT id, nom_boutique, ville, secteur FROM merchants ORDER BY id'
     );
     res.json(result.rows);
   } catch(e) { res.status(500).json({ error: e.message }); }
