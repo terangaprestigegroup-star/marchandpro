@@ -487,6 +487,50 @@ function parserCommandeMerchant(message, catalogue) {
   return produits;
 }
 
+// ============================================
+// TRANSCRIPTION VOCALE — Groq Whisper
+// ============================================
+async function transcrireVocal(mediaId) {
+  try {
+    const GROQ_API_KEY = process.env.GROQ_API_KEY;
+    const META_TOKEN = process.env.META_TOKEN;
+
+    // 1. Récupérer URL du fichier audio depuis Meta
+    const mediaRes = await fetch(`https://graph.facebook.com/v18.0/${mediaId}`, {
+      headers: { 'Authorization': `Bearer ${META_TOKEN}` }
+    });
+    const mediaData = await mediaRes.json();
+    if (!mediaData.url) throw new Error('URL audio introuvable');
+
+    // 2. Télécharger le fichier audio
+    const audioRes = await fetch(mediaData.url, {
+      headers: { 'Authorization': `Bearer ${META_TOKEN}` }
+    });
+    const audioBuffer = await audioRes.arrayBuffer();
+    const audioBytes = Buffer.from(audioBuffer);
+
+    // 3. Envoyer à Groq Whisper
+    const formData = new FormData();
+    const blob = new Blob([audioBytes], { type: 'audio/ogg' });
+    formData.append('file', blob, 'vocal.ogg');
+    formData.append('model', 'whisper-large-v3');
+    formData.append('language', 'fr');
+    formData.append('response_format', 'json');
+
+    const whisperRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${GROQ_API_KEY}` },
+      body: formData
+    });
+    const whisperData = await whisperRes.json();
+    console.log('Whisper transcription:', whisperData.text);
+    return whisperData.text || null;
+  } catch(e) {
+    console.error('Erreur Whisper:', e.message);
+    return null;
+  }
+}
+
 app.post('/webhook/whatsapp', async (req, res) => {
   try {
     const body = req.body;
@@ -494,6 +538,80 @@ app.post('/webhook/whatsapp', async (req, res) => {
       const entry = body.entry?.[0];
       const change = entry?.changes?.[0];
       const message = change?.value?.messages?.[0];
+
+      // ============================================
+      // GESTION MESSAGES VOCAUX (audio/ogg)
+      // ============================================
+      if (message && (message.type === 'audio' || message.type === 'voice')) {
+        const phone = message.from;
+        const phone_id = change.value.metadata.phone_number_id;
+        const mediaId = message.audio?.id || message.voice?.id;
+
+        // Accusé de réception immédiat
+        await envoyerWhatsApp(phone_id, phone, `🎙️ *Vocal reçu !* Je transcris votre message...`);
+
+        const transcription = await transcrireVocal(mediaId);
+
+        if (!transcription) {
+          await envoyerWhatsApp(phone_id, phone,
+            `❌ Je n'ai pas pu comprendre votre vocal.\n\nEssayez de parler plus clairement ou tapez votre commande en texte. 😊`
+          );
+          return res.sendStatus(200);
+        }
+
+        // Log et traitement comme un message texte
+        console.log(`🎙️ Vocal transcrit [${phone}]: "${transcription}"`);
+
+        const merchant = await getMerchantByClient(phone);
+        const catalogue = merchant.catalogue || CATALOGUE;
+        const texte = transcription.toLowerCase();
+        const produits = parserCommandeMerchant(texte, catalogue);
+
+        if (produits.length > 0) {
+          // Calculer total + remises
+          const total = produits.reduce((sum, p) => sum + p.total, 0);
+          let totalApresRemise = total;
+          let remiseMsg = '';
+          produits.forEach(p => {
+            if (p.quantite >= 10) {
+              const remise = Math.round(p.total * 0.05);
+              totalApresRemise -= remise;
+              remiseMsg += `🎁 Remise 5% sur ${p.produit} : -${remise.toLocaleString('fr-FR')} FCFA\n`;
+            } else if (p.quantite >= 5) {
+              const remise = Math.round(p.total * 0.03);
+              totalApresRemise -= remise;
+              remiseMsg += `🎁 Remise 3% sur ${p.produit} : -${remise.toLocaleString('fr-FR')} FCFA\n`;
+            }
+          });
+
+          const count = await pool.query('SELECT COUNT(*) FROM orders');
+          const ref = `CMD-${String(parseInt(count.rows[0].count) + 1).padStart(4,'0')}`;
+          const lignes = produits.map(p => `• ${p.quantite} ${p.unite} de *${p.produit}* — ${p.total.toLocaleString('fr-FR')} FCFA`).join('\n');
+
+          await pool.query(
+            'INSERT INTO orders (merchant_id, customer_phone, items, total, status, reference) VALUES ($1,$2,$3,$4,$5,$6)',
+            [merchant.id, phone, JSON.stringify(produits), totalApresRemise, 'nouveau', ref]
+          );
+          const orderId = (await pool.query('SELECT id FROM orders WHERE reference=$1', [ref])).rows[0]?.id;
+          if (orderId) pendingAddress[phone] = { orderId, ref, total: totalApresRemise };
+
+          await envoyerWhatsApp(phone_id, phone,
+            `🎙️ *J'ai bien entendu :* _"${transcription}"_\n\n` +
+            `✅ *Commande enregistrée !*\n\n${lignes}\n\n${remiseMsg}` +
+            `💰 *Total : ${totalApresRemise.toLocaleString('fr-FR')} FCFA*\n📋 Réf : *${ref}*\n\n` +
+            `📍 À quelle adresse souhaitez-vous être livré ?`
+          );
+        } else {
+          await envoyerWhatsApp(phone_id, phone,
+            `🎙️ *J'ai transcrit :* _"${transcription}"_\n\n` +
+            `❓ Je n'ai pas reconnu de produit dans votre vocal.\n\n` +
+            `Dites par exemple :\n_"je veux cinq sacs de riz et deux bidons d'huile"_\n\n` +
+            `Ou tapez *catalogue* pour voir les produits disponibles.`
+          );
+        }
+        return res.sendStatus(200);
+      }
+
       if (message && message.type === 'text') {
         const phone = message.from;
         const texteOriginal = message.text.body.trim();
