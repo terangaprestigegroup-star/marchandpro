@@ -1069,6 +1069,25 @@ app.put('/api/orders/:id', authMiddleware, async (req, res) => {
   const result = await pool.query('UPDATE orders SET status=$1 WHERE id=$2 RETURNING *', [status, req.params.id]);
   const order = result.rows[0];
 
+  // ── NOTIFICATIONS STATUT CLIENT ──
+  if (order && order.customer_phone) {
+    const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+    const notifs = {
+      'confirmé': `🔄 *Votre commande ${order.reference} est confirmée !*\n\nVotre grossiste prépare votre commande. Vous serez livré bientôt. 📦`,
+      'en route': `🚚 *Votre commande ${order.reference} est en route !*\n\nVotre livraison est en chemin. Restez disponible. 📍`,
+      'livré': null, // Géré par le système d'avis
+      'annulé': `❌ *Votre commande ${order.reference} a été annulée.*\n\nPour plus d'informations, contactez votre grossiste. 📞`
+    };
+    const msg = notifs[status];
+    if (msg) {
+      setTimeout(async () => {
+        try {
+          await envoyerWhatsApp(PHONE_NUMBER_ID, order.customer_phone, msg);
+        } catch(e) { console.error('Erreur notif statut:', e.message); }
+      }, 1000);
+    }
+  }
+
   // ── AVIS CLIENT — Envoi automatique quand statut = "livré"
   if (status === 'livré' && order) {
     try {
