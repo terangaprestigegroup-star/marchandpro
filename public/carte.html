@@ -96,8 +96,14 @@ function makeIcon(couleur, emoji) {
 
 async function charger() {
   try {
-    const r = await fetch('/api/merchants-public');
+    const base = window.location.origin;
+    const r = await fetch(base + '/api/merchants-public');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     MERCHANTS = await r.json();
+    if (!Array.isArray(MERCHANTS) || MERCHANTS.length === 0) {
+      document.getElementById('bottom-txt').textContent = '⚠️ Aucun grossiste trouvé';
+      return;
+    }
 
     const secteurs = [...new Set(MERCHANTS.map(m => m.secteur).filter(Boolean))];
     const fil = document.getElementById('filters');
@@ -148,7 +154,10 @@ async function charger() {
     const n = MERCHANTS.length;
     document.getElementById('cnt').textContent = n + ' grossiste' + (n>1?'s':'');
     document.getElementById('bottom-txt').textContent = '📍 ' + n + ' grossiste' + (n>1?'s':'') + ' sur la carte';
-  } catch(e) { console.error(e); }
+  } catch(e) {
+    console.error('Erreur chargement:', e);
+    document.getElementById('bottom-txt').textContent = '❌ Erreur: ' + e.message;
+  }
 }
 
 function filtrer(secteur, btn) {
