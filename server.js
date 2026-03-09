@@ -2448,8 +2448,22 @@ app.get('/carte', async (req, res) => {
 
 app.get('/api/merchants-public', async (req, res) => {
   try {
-    const data = await pool.query('SELECT id, nom_boutique, ville, secteur FROM merchants ORDER BY id');
-    // Ajouter secteur par défaut si null
+    // Découvrir les vraies colonnes
+    const cols = await pool.query(`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name='merchants' ORDER BY ordinal_position
+    `);
+    const colNames = cols.rows.map(r => r.column_name);
+    console.log('Colonnes merchants:', colNames);
+    
+    const hasSecteur = colNames.includes('secteur');
+    const hasTypeCommerce = colNames.includes('type_commerce');
+    const hasVille = colNames.includes('ville');
+    
+    const secteurExpr = hasSecteur ? 'secteur' : hasTypeCommerce ? 'type_commerce as secteur' : "'alimentaire' as secteur";
+    const villeExpr = hasVille ? 'ville' : "'Dakar' as ville";
+    
+    const data = await pool.query(`SELECT id, nom_boutique, ${villeExpr}, ${secteurExpr} FROM merchants ORDER BY id`);
     const rows = data.rows.map(m => ({
       ...m,
       secteur: m.secteur || 'alimentaire',
