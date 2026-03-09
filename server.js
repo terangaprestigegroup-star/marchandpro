@@ -1690,6 +1690,24 @@ app.get('/boutique/:slug', async (req, res) => {
   const BASE = 'https://marchandpro-production-b529.up.railway.app';
   const WA = `https://wa.me/221711288439?text=${encodeURIComponent(`Bonjour ${m.nom_boutique} ! Je veux commander.`)}`;
 
+  // Récupérer les avis clients
+  const avisRes = await pool.query(
+    `SELECT items, customer_phone, created_at FROM orders 
+     WHERE merchant_id=$1 AND items->>'note' IS NOT NULL 
+     ORDER BY created_at DESC LIMIT 10`,
+    [m.id]
+  );
+  const avisListe = avisRes.rows.map(r => ({
+    note: parseInt(r.items?.note || 0),
+    avis: r.items?.avis || '',
+    phone: (r.customer_phone || '').replace('whatsapp:+','').replace('whatsapp:','').slice(-4),
+    date: new Date(r.created_at).toLocaleDateString('fr-FR')
+  })).filter(a => a.note > 0);
+
+  const noteMoyenne = avisListe.length > 0
+    ? (avisListe.reduce((s, a) => s + a.note, 0) / avisListe.length).toFixed(1)
+    : null;
+
   const SECTEUR_COLORS = {
     alimentaire: '#006633', menagers: '#1565C0', poisson: '#00838F',
     pharmacie: '#AD1457', quincaillerie: '#E65100', telephonie: '#4527A0',
@@ -1747,7 +1765,21 @@ body{font-family:'DM Sans',sans-serif;background:#f5f7f5;color:#1a2e1a;min-heigh
 .info-label{color:#5a7a5a;font-size:12px}
 .info-val{font-weight:600}
 .plan-badge{display:inline-block;padding:4px 12px;border-radius:50px;font-size:11px;font-weight:800;background:#fff9e6;color:#cc9900;border:1px solid #FFD700}
-.qr-wrap{text-align:center;padding:8px}
+.avis-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.note-globale{display:flex;align-items:center;gap:10px}
+.note-num{font-family:'Syne',sans-serif;font-size:36px;font-weight:800;color:${couleur};line-height:1}
+.note-etoiles{font-size:16px;margin-bottom:2px}
+.note-count{font-size:12px;color:#5a7a5a}
+.avis-item{padding:14px 0;border-bottom:1px solid #f5f5f5}
+.avis-item:last-child{border-bottom:none}
+.avis-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.avis-etoiles{font-size:14px}
+.avis-date{font-size:11px;color:#5a7a5a}
+.avis-phone{font-size:12px;color:#5a7a5a;margin-bottom:4px}
+.avis-texte{font-size:13px;font-style:italic;color:#1a2e1a}
+.avis-vide{text-align:center;padding:24px;color:#5a7a5a;font-size:13px}
+.badge-note{display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:50px;font-size:12px;font-weight:700}
+
 .qr-label{font-size:13px;color:#5a7a5a;margin-top:12px}
 .remise-note{background:#e8f5e9;border-radius:10px;padding:12px 14px;font-size:13px;color:${couleur};font-weight:600;margin-bottom:16px}
 .footer-mini{text-align:center;padding:24px 20px;color:#5a7a5a;font-size:12px}
@@ -1769,6 +1801,7 @@ body{font-family:'DM Sans',sans-serif;background:#f5f7f5;color:#1a2e1a;min-heigh
       <span class="meta-badge">📍 ${m.ville}</span>
       <span class="meta-badge">${emoji} ${m.secteur || 'Alimentaire'}</span>
       <span class="meta-badge">✅ Ouvert</span>
+      ${noteMoyenne ? `<span class="meta-badge">⭐ ${noteMoyenne}/5 (${avisListe.length} avis)</span>` : ''}
     </div>
   </div>
 </div>
@@ -1831,6 +1864,36 @@ body{font-family:'DM Sans',sans-serif;background:#f5f7f5;color:#1a2e1a;min-heigh
     }).join('')}
     ${catalogue.length > 6 ? `<div style="text-align:center;padding:12px 0;font-size:13px;color:#5a7a5a">+ ${catalogue.length-6} autres produits →  <a href="${BASE}/catalogue/${m.id}" style="color:${couleur};font-weight:700">Voir tout</a></div>` : ''}
   </div>` : ''}
+
+  <!-- AVIS CLIENTS -->
+  <div class="card">
+    <div class="avis-header">
+      <div class="b-card-title">⭐ Avis clients</div>
+      ${noteMoyenne ? `
+      <div class="note-globale">
+        <div class="note-num">${noteMoyenne}</div>
+        <div>
+          <div class="note-etoiles">${'⭐'.repeat(Math.round(parseFloat(noteMoyenne)))}</div>
+          <div class="note-count">${avisListe.length} avis</div>
+        </div>
+      </div>` : ''}
+    </div>
+    ${avisListe.length === 0 ? `
+    <div class="avis-vide">
+      <div style="font-size:32px;margin-bottom:8px">💬</div>
+      <div>Aucun avis pour l'instant</div>
+      <div style="margin-top:4px;font-size:12px">Commandez et partagez votre expérience !</div>
+    </div>` :
+    avisListe.slice(0,5).map(a => `
+    <div class="avis-item">
+      <div class="avis-top">
+        <div class="avis-etoiles">${'⭐'.repeat(a.note)}</div>
+        <div class="avis-date">${a.date}</div>
+      </div>
+      <div class="avis-phone">Client •••• ${a.phone}</div>
+      ${a.avis && !['1','2','3','4','5','oui','non'].includes(a.avis) ? `<div class="avis-texte">"${a.avis}"</div>` : ''}
+    </div>`).join('')}
+  </div>
 
   <!-- QR CODE -->
   <div class="card">
