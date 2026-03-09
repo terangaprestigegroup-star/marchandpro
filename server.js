@@ -2144,7 +2144,7 @@ app.get('/api/relances', async (req, res) => {
 // ============================================
 // BILAN MENSUEL PDF
 // ============================================
-app.get('/api/bilan/:merchant_id', authMiddleware, async (req, res) => {
+app.get('/api/bilan/:merchant_id', async (req, res) => {
   try {
     const { merchant_id } = req.params;
     const { mois, annee } = req.query;
