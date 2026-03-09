@@ -821,13 +821,6 @@ async function loadDashboard() {
 
 // ── PROMO FLASH ──
 function ouvrirModalPromo() {
-  // Compter les clients
-  fetch(`${API}/orders?merchant_id=${merchantId}`, { headers: { 'Authorization': 'Bearer ' + token } })
-    .then(r => r.json())
-    .then(orders => {
-      const clients = new Set(orders.map(o => o.customer_phone).filter(Boolean));
-      document.getElementById('promo-nb-clients').textContent = clients.size + ' client(s)';
-    }).catch(() => {});
   document.getElementById('promo-modal').classList.add('open');
 }
 
@@ -843,23 +836,28 @@ async function envoyerPromo() {
   const produit = document.getElementById('promo-produit').value.trim();
   const remise = document.getElementById('promo-remise').value.trim();
 
-  if (!message) { afficherToast('❌ Écrivez un message de promotion !'); return; }
+  if (!message) { toast('❌ Écrivez un message de promotion !'); return; }
+
+  // Récupérer merchant_id depuis l'URL ou le dashboard
+  const urlParams = new URLSearchParams(window.location.search);
+  const mid = urlParams.get('merchant_id') || 1;
+  const tok = urlParams.get('token') || '';
 
   const btn = document.getElementById('btn-envoyer-promo');
   btn.textContent = '⏳ Envoi en cours...';
   btn.disabled = true;
 
   try {
-    const res = await fetch(`${API}/promo`, {
+    const res = await fetch(`${API}/api/promo`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ merchant_id: merchantId, message, produit: produit || null, remise: remise || null })
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+      body: JSON.stringify({ merchant_id: mid, message, produit: produit || null, remise: remise || null })
     });
     const data = await res.json();
     fermerModalPromo();
-    afficherToast(`✅ Promotion envoyée à ${data.envoyes} client(s) !`);
+    toast(`✅ Promotion envoyée à ${data.envoyes} client(s) !`);
   } catch(e) {
-    afficherToast('❌ Erreur lors de l\'envoi');
+    toast('❌ Erreur lors de l\'envoi');
   } finally {
     btn.textContent = '📣 Envoyer la promotion';
     btn.disabled = false;
