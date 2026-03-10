@@ -732,9 +732,14 @@ function renderCommandes(commandes) {
               </select>
             </td>
             <td style="font-size:12px;color:var(--texte-light)">${formatDate(cmd.created_at)}</td>
-            <td><a href="${API}/api/facture/${cmd.id}" target="_blank"
-              style="display:inline-block;background:var(--vert-clair);color:var(--vert);padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;border:1px solid var(--vert)">
-              🧾 Voir</a></td>
+            <td>
+              <a href="${API}/api/facture/${cmd.id}" target="_blank"
+              style="display:inline-block;background:var(--vert-clair);color:var(--vert);padding:6px 10px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;border:1px solid var(--vert);margin-right:4px">
+              🧾 Voir</a>
+              <a href="${API}/api/facture/${cmd.id}/pdf" target="_blank"
+              style="display:inline-block;background:#e3f2fd;color:#1565C0;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;border:1px solid #1565C0">
+              ⬇️ PDF</a>
+            </td>
           </tr>`).join('')}
       </tbody>
     </table>`;
