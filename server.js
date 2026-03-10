@@ -2102,6 +2102,16 @@ app.put('/api/merchants/:id/plan', async (req, res) => {
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
+app.put('/api/merchants/:id/secteur', async (req, res) => {
+  try {
+    const { secteur } = req.body;
+    const secteurs = ['alimentaire','menagers','poisson','pharmacie','quincaillerie','telephonie','textile','cosmetiques','cereales','viande','emballage'];
+    if (!secteurs.includes(secteur)) return res.status(400).json({ error: 'Secteur invalide' });
+    await pool.query('UPDATE merchants SET secteur=$1 WHERE id=$2', [secteur, req.params.id]);
+    res.json({ ok: true });
+  } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
 // Activer/désactiver un merchant
 app.put('/api/merchants/:id/toggle', async (req, res) => {
   try {
@@ -2115,6 +2125,171 @@ app.get('/hub', (req, res) => res.sendFile(path.join(__dirname, 'public', 'hub.h
 
 // Page QR codes
 app.get('/qr', (req, res) => res.sendFile(path.join(__dirname, 'public', 'qr.html')));
+
+// ============================================
+// TABLEAU LIVREUR
+// ============================================
+app.get('/livreur/:merchant_id', async (req, res) => {
+  try {
+    const { merchant_id } = req.params;
+    const merchantRes = await pool.query('SELECT * FROM merchants WHERE id=$1', [merchant_id]);
+    if (!merchantRes.rows[0]) return res.status(404).send('Boutique introuvable');
+    const m = merchantRes.rows[0];
+
+    const ordersRes = await pool.query(
+      `SELECT * FROM orders WHERE merchant_id=$1 AND status IN ('confirmé','en route') ORDER BY created_at DESC`,
+      [merchant_id]
+    );
+    const orders = ordersRes.rows;
+
+    res.send(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Livraisons — ${m.nom_boutique}</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@800&family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:#f4f6f4;min-height:100vh}
+.header{background:linear-gradient(135deg,#004d26,#006633);color:white;padding:16px 20px;position:sticky;top:0;z-index:100}
+.header h1{font-family:'Syne',sans-serif;font-size:18px;font-weight:800}
+.header p{font-size:12px;opacity:0.8;margin-top:2px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px}
+.stat{background:white;border-radius:12px;padding:14px;text-align:center;border-left:4px solid #006633}
+.stat-val{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:#006633}
+.stat-label{font-size:12px;color:#5a7a5a;margin-top:2px}
+.section-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;padding:0 16px 10px;color:#0d1f0d}
+.cmd-card{background:white;margin:0 16px 12px;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.cmd-header{padding:14px 16px;border-bottom:1px solid #f5f5f5;display:flex;align-items:center;justify-content:space-between}
+.cmd-ref{font-weight:800;font-size:14px;color:#006633}
+.cmd-badge{padding:4px 10px;border-radius:50px;font-size:11px;font-weight:700}
+.badge-confirme{background:#e3f2fd;color:#1565C0}
+.badge-route{background:#fff9e6;color:#cc9900}
+.cmd-body{padding:14px 16px}
+.cmd-client{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.cmd-phone{font-weight:700;font-size:14px}
+.cmd-adresse{background:#f4f6f4;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px;line-height:1.5}
+.cmd-produits{font-size:12px;color:#5a7a5a;margin-bottom:14px;line-height:1.6}
+.cmd-total{font-weight:800;font-size:16px;color:#006633;margin-bottom:14px}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{border:none;padding:12px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all 0.2s}
+.btn-livrer{background:#006633;color:white}
+.btn-livrer:active{background:#004d26}
+.btn-appeler{background:#25D366;color:white}
+.btn-itineraire{background:#1565C0;color:white}
+.btn-probleme{background:#fce4ec;color:#c0392b}
+.empty{text-align:center;padding:60px 20px;color:#5a7a5a}
+.empty-icon{font-size:48px;margin-bottom:12px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#006633;color:white;padding:12px 24px;border-radius:50px;font-weight:700;font-size:14px;z-index:999;opacity:0;transition:opacity 0.3s;white-space:nowrap}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🚚 Livraisons du jour</h1>
+  <p>${m.nom_boutique} · ${new Date().toLocaleDateString('fr-FR', {weekday:'long',day:'numeric',month:'long'})}</p>
+</div>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-val">${orders.length}</div>
+    <div class="stat-label">📦 À livrer</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val">${orders.filter(o=>o.status==='en route').length}</div>
+    <div class="stat-label">🚚 En route</div>
+  </div>
+</div>
+
+<div class="section-title">📋 Commandes à livrer</div>
+
+${orders.length === 0 ? `
+<div class="empty">
+  <div class="empty-icon">✅</div>
+  <div style="font-weight:800;font-size:16px;margin-bottom:8px">Toutes les livraisons sont faites !</div>
+  <div style="font-size:13px">Aucune commande en attente.</div>
+</div>` :
+orders.map(o => {
+  const items = Array.isArray(o.items) ? o.items.filter(i => i.produit && i.produit.length > 2) : [];
+  const produitsStr = items.map(i => `${i.quantite}x ${i.produit}`).join(' · ') || '—';
+  const adresse = o.delivery_address || o.items?.find?.(i => i.adresse)?.adresse || 'Adresse non renseignée';
+  const phone = (o.customer_phone||'').replace('whatsapp:+','+').replace('whatsapp:','');
+  const phoneWa = phone.replace('+','');
+  const badge = o.status === 'en route' ? '<span class="cmd-badge badge-route">🚚 En route</span>' : '<span class="cmd-badge badge-confirme">✅ Confirmé</span>';
+  return `
+<div class="cmd-card" id="card-${o.id}">
+  <div class="cmd-header">
+    <span class="cmd-ref">${o.reference || 'CMD-' + String(o.id).padStart(4,'0')}</span>
+    ${badge}
+  </div>
+  <div class="cmd-body">
+    <div class="cmd-client">
+      <span style="font-size:20px">👤</span>
+      <span class="cmd-phone">${phone}</span>
+    </div>
+    <div class="cmd-adresse">📍 ${adresse}</div>
+    <div class="cmd-produits">📦 ${produitsStr}</div>
+    <div class="cmd-total">💰 ${Number(o.total||0).toLocaleString('fr-FR')} FCFA</div>
+    <div class="btn-row">
+      <button class="btn btn-livrer" onclick="marquerLivre(${o.id}, this)">✅ Livré</button>
+      <a href="https://wa.me/${phoneWa}" class="btn btn-appeler" style="text-decoration:none;display:flex;align-items:center;justify-content:center">📲 Appeler</a>
+    </div>
+    <div style="margin-top:8px">
+      <a href="https://www.google.com/maps/search/${encodeURIComponent(adresse + ', Dakar, Sénégal')}" target="_blank" class="btn btn-itineraire" style="display:block;text-decoration:none;text-align:center;padding:10px">🗺️ Itinéraire Google Maps</a>
+    </div>
+  </div>
+</div>`;
+}).join('')}
+
+<div style="height:30px"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const MERCHANT_ID = ${merchant_id};
+
+async function marquerLivre(orderId, btn) {
+  btn.disabled = true;
+  btn.textContent = '⏳ En cours...';
+  try {
+    const r = await fetch('/api/livreur/livrer/' + orderId, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ merchant_id: MERCHANT_ID })
+    });
+    if (r.ok) {
+      toast('✅ Livraison confirmée !');
+      const card = document.getElementById('card-' + orderId);
+      card.style.opacity = '0.4';
+      card.style.transition = 'opacity 0.5s';
+      setTimeout(() => card.remove(), 600);
+    } else {
+      btn.disabled = false;
+      btn.textContent = '✅ Livré';
+      toast('❌ Erreur — réessaye');
+    }
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = '✅ Livré';
+    toast('❌ Erreur réseau');
+  }
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>`);
+  } catch(e) {
+    console.error('Erreur livreur:', e);
+    res.status(500).send('Erreur serveur');
+  }
+});
 
 // Catalogue Pro — page partageable par grossiste
 app.get('/catalogue/:id', (req, res) => res.sendFile(path.join(__dirname, 'public', 'catalogue.html')));
@@ -2453,6 +2628,30 @@ function planifierRelances() {
 // ============================================
 // CARTE DES GROSSISTES
 // ============================================
+// API livreur — marquer commande livrée
+app.post('/api/livreur/livrer/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { merchant_id } = req.body;
+    const result = await pool.query(
+      'UPDATE orders SET status=$1 WHERE id=$2 AND merchant_id=$3 RETURNING *',
+      ['livré', id, merchant_id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Commande introuvable' });
+    const order = result.rows[0];
+    const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+    if (order.customer_phone) {
+      try {
+        await envoyerWhatsApp(PHONE_NUMBER_ID, order.customer_phone,
+          `📦 *Votre commande ${order.reference} a été livrée !*\n\nMerci pour votre confiance 🙏\n\n⭐ Comment s'est passée votre livraison ?\n1️⃣ Mauvais  2️⃣ Correct  3️⃣ Excellent`
+        );
+        pendingAvis[order.customer_phone] = { orderId: order.id, merchantId: order.merchant_id, ref: order.reference };
+      } catch(e) { console.error('Erreur notif livreur:', e.message); }
+    }
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/carte', (req, res) => res.sendFile(path.join(__dirname, 'public', 'carte.html')));
 
 app.get('/api/merchants-public', async (req, res) => {
