@@ -42,6 +42,9 @@ body{font-family:'DM Sans',sans-serif;background:#f4f6f4;overflow:hidden}
 <div class="filters" id="filters">
   <button class="f-btn active" onclick="filtrer('tous',this)">🗺️ Tous</button>
 </div>
+<div class="filters" id="filters-villes" style="background:#f4f4f4;border-top:1px solid #e0e0e0">
+  <button class="f-btn active" onclick="filtrerVille('toutes',this)">📍 Toutes villes</button>
+</div>
 
 <div id="map"></div>
 
@@ -125,6 +128,17 @@ async function charger(retry = 0) {
       fil.appendChild(btn);
     });
 
+    // Boutons villes
+    const villes = [...new Set(MERCHANTS.map(m => m.ville).filter(Boolean))];
+    const filV = document.getElementById('filters-villes');
+    villes.forEach(v => {
+      const btn = document.createElement('button');
+      btn.className = 'f-btn';
+      btn.textContent = '📍 ' + v;
+      btn.onclick = function(){ filtrerVille(v, this); };
+      filV.appendChild(btn);
+    });
+
     const list = document.getElementById('drawer-list');
     list.innerHTML = '';
 
@@ -139,6 +153,7 @@ async function charger(retry = 0) {
 
       const marker = L.marker([lat, lng], { icon: makeIcon(couleur, emoji) }).addTo(map);
       marker.secteur = m.secteur || '';
+      marker.ville = m.ville || 'Dakar';
       marker.bindPopup(
         '<div style="font-family:sans-serif;min-width:180px">' +
         '<div style="font-size:20px;margin-bottom:6px">' + emoji + '</div>' +
@@ -154,6 +169,7 @@ async function charger(retry = 0) {
       card.href = '/boutique/' + m.id;
       card.className = 'm-card';
       card.dataset.secteur = m.secteur || '';
+      card.dataset.ville = m.ville || 'Dakar';
       card.innerHTML =
         '<div class="m-av" style="background:' + couleur + '22">' + emoji + '</div>' +
         '<div><div class="m-nom">' + m.nom_boutique + '</div>' +
@@ -173,20 +189,40 @@ async function charger(retry = 0) {
 }
 
 function filtrer(secteur, btn) {
-  document.querySelectorAll('.f-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#filters .f-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  FILTRE_SECTEUR = secteur;
+  appliquerFiltres();
+}
+
+let FILTRE_SECTEUR = 'tous';
+let FILTRE_VILLE = 'toutes';
+
+function filtrerVille(ville, btn) {
+  document.querySelectorAll('#filters-villes .f-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  FILTRE_VILLE = ville;
+  appliquerFiltres();
+}
+
+function appliquerFiltres() {
   let count = 0;
   markers.forEach(mk => {
-    const visible = secteur === 'tous' || mk.secteur === secteur;
+    const okSecteur = FILTRE_SECTEUR === 'tous' || mk.secteur === FILTRE_SECTEUR;
+    const okVille = FILTRE_VILLE === 'toutes' || (mk.ville||'').toLowerCase() === FILTRE_VILLE.toLowerCase();
+    const visible = okSecteur && okVille;
     visible ? mk.addTo(map) : map.removeLayer(mk);
     if (visible) count++;
   });
   document.querySelectorAll('.m-card').forEach(c => {
-    c.style.display = (secteur === 'tous' || c.dataset.secteur === secteur) ? 'flex' : 'none';
+    const okS = FILTRE_SECTEUR === 'tous' || c.dataset.secteur === FILTRE_SECTEUR;
+    const okV = FILTRE_VILLE === 'toutes' || (c.dataset.ville||'').toLowerCase() === FILTRE_VILLE.toLowerCase();
+    c.style.display = (okS && okV) ? 'flex' : 'none';
   });
   document.getElementById('cnt').textContent = count + ' grossiste' + (count>1?'s':'');
   document.getElementById('bottom-txt').textContent = '📍 ' + count + ' grossiste' + (count>1?'s':'') + ' sur la carte';
 }
+
 
 function openDrawer() {
   document.getElementById('drawer').classList.add('open');
