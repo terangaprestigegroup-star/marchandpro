@@ -59,7 +59,12 @@ body{font-family:'DM Sans',sans-serif;background:#f4f6f4;overflow:hidden}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
-const COLORS = {
+const LABELS = {
+  alimentaire:'Alimentaire', menagers:'Ménagers', poisson:'Poisson & Marée',
+  pharmacie:'Pharmacie', quincaillerie:'Quincaillerie', telephonie:'Téléphonie',
+  textile:'Textile', cosmetiques:'Cosmétiques', cereales:'Céréales',
+  viande:'Viande & Volaille', emballage:'Emballage', boissons:'Boissons', gaz:'Gaz & Énergie'
+};
   alimentaire:'#006633',menagers:'#1565C0',poisson:'#00838F',pharmacie:'#AD1457',
   quincaillerie:'#E65100',telephonie:'#4527A0',textile:'#558B2F',cosmetiques:'#880E4F',
   cereales:'#5D4037',viande:'#B71C1C',emballage:'#37474F'
@@ -121,6 +126,7 @@ async function charger() {
     MERCHANTS.forEach((m, i) => {
       const couleur = COLORS[m.secteur] || '#006633';
       const emoji = EMOJIS[m.secteur] || '🛒';
+      const label = LABELS[m.secteur] || m.secteur || 'Général';
       const key = (m.ville||'dakar').toLowerCase().trim();
       const c = COORDS[key] || COORDS['dakar'];
       const lat = c[0] + Math.sin(i*1.5)*i*0.002;
@@ -132,7 +138,7 @@ async function charger() {
         '<div style="font-family:sans-serif;min-width:180px">' +
         '<div style="font-size:20px;margin-bottom:6px">' + emoji + '</div>' +
         '<div style="font-weight:800;font-size:14px;margin-bottom:4px">' + m.nom_boutique + '</div>' +
-        '<div style="font-size:11px;color:#5a7a5a;margin-bottom:10px">📍 ' + (m.ville||'Dakar') + ' · ' + (m.secteur||'Général') + '</div>' +
+        '<div style="font-size:11px;color:#5a7a5a;margin-bottom:10px">📍 ' + (m.ville||'Dakar') + ' · ' + label + '</div>' +
         '<a href="/boutique/' + m.id + '" style="display:block;background:' + couleur + ';color:white;padding:8px;border-radius:8px;text-decoration:none;font-weight:700;font-size:12px;text-align:center;margin-bottom:6px">Voir la boutique →</a>' +
         '<a href="https://wa.me/221711288439?text=' + encodeURIComponent('Bonjour ' + m.nom_boutique + ' !') + '" target="_blank" style="display:block;background:#25D366;color:white;padding:8px;border-radius:8px;text-decoration:none;font-weight:700;font-size:12px;text-align:center">📲 Commander</a>' +
         '</div>'
@@ -146,7 +152,7 @@ async function charger() {
       card.innerHTML =
         '<div class="m-av" style="background:' + couleur + '22">' + emoji + '</div>' +
         '<div><div class="m-nom">' + m.nom_boutique + '</div>' +
-        '<div class="m-meta">📍 ' + (m.ville||'Dakar') + ' · ' + emoji + ' ' + (m.secteur||'Général') + '</div></div>' +
+        '<div class="m-meta">📍 ' + (m.ville||'Dakar') + ' · ' + emoji + ' ' + label + '</div></div>' +
         '<span style="margin-left:auto;color:#5a7a5a">→</span>';
       list.appendChild(card);
     });
