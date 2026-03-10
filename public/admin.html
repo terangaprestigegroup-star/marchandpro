@@ -242,6 +242,34 @@ tr:hover td { background:#fafcfa; }
   </div>
 </div>
 
+<!-- MODAL SECTEUR -->
+<div class="modal-overlay" id="secteur-modal">
+  <div class="modal">
+    <div class="modal-title" id="secteur-modal-title">🏪 Secteur d'activité</div>
+    <input type="hidden" id="secteur-merchant-id" />
+    <div class="modal-field">
+      <label>Choisir le secteur</label>
+      <select id="secteur-select" style="font-size:14px;padding:10px">
+        <option value="alimentaire">🌾 Alimentaire</option>
+        <option value="menagers">🧴 Ménagers</option>
+        <option value="poisson">🐟 Poisson & Marée</option>
+        <option value="pharmacie">💊 Pharmacie</option>
+        <option value="quincaillerie">🔧 Quincaillerie</option>
+        <option value="telephonie">📱 Téléphonie</option>
+        <option value="textile">👗 Textile</option>
+        <option value="cosmetiques">💄 Cosmétiques</option>
+        <option value="cereales">🌿 Céréales</option>
+        <option value="viande">🥩 Viande & Volaille</option>
+        <option value="emballage">📦 Emballage</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-outline" onclick="document.getElementById('secteur-modal').classList.remove('open')">Annuler</button>
+      <button class="btn" style="background:#006633;color:white" onclick="confirmerSecteur()">✅ Confirmer</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -325,6 +353,7 @@ function afficherMerchants(data) {
       <td>
         <div class="btn-group">
           <button class="btn btn-or" onclick="changerPlan(${m.id}, '${m.plan}', '${m.nom_boutique}')">⭐ Plan</button>
+          <button class="btn" style="background:#e8f5e9;color:#006633;border:1px solid #006633" onclick="changerSecteur(${m.id}, '${m.secteur||''}', '${m.nom_boutique}')">🏪 Secteur</button>
           <button class="btn ${m.actif?'btn-rouge':'btn-vert'}" onclick="toggleActif(${m.id}, ${m.actif})">
             ${m.actif?'⏸️ Suspendre':'▶️ Activer'}
           </button>
@@ -367,6 +396,41 @@ async function confirmerPlan() {
     else toast('Erreur: ' + data.error, false);
   } catch(err) { toast('Erreur serveur', false); }
 }
+
+function changerSecteur(id, secteurActuel, nom) {
+  document.getElementById('secteur-modal-title').textContent = `🏪 Secteur de ${nom}`;
+  document.getElementById('secteur-select').value = secteurActuel || 'alimentaire';
+  document.getElementById('secteur-merchant-id').value = id;
+  document.getElementById('secteur-modal').classList.add('open');
+}
+
+async function confirmerSecteur() {
+  const id = document.getElementById('secteur-merchant-id').value;
+  const secteur = document.getElementById('secteur-select').value;
+  try {
+    const res = await fetch(`${API}/api/merchants/${id}/secteur`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secteur })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast(`✅ Secteur changé : ${secteur} !`);
+      document.getElementById('secteur-modal').classList.remove('open');
+      charger();
+    } else toast('Erreur: ' + data.error, false);
+  } catch(err) { toast('Erreur serveur', false); }
+}
+
+function getSecteurBadge(secteur) {
+  const emojis = { alimentaire:'🌾', menagers:'🧴', poisson:'🐟', pharmacie:'💊',
+    quincaillerie:'🔧', telephonie:'📱', textile:'👗', cosmetiques:'💄',
+    cereales:'🌿', viande:'🥩', emballage:'📦' };
+  const emoji = emojis[secteur] || '🏪';
+  return `<span style="background:#e8f5e9;color:#006633;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700">${emoji} ${secteur||'—'}</span>`;
+}
+
+
 
 async function toggleActif(id, actuel) {
   try {
