@@ -142,7 +142,7 @@ async function initDB() {
     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS mois_offerts INTEGER DEFAULT 0;
     INSERT INTO merchants (id, nom_boutique, proprietaire, whatsapp, ville, plan, catalogue)
     VALUES (1, 'MarchandPro Demo', 'Terangaprestige', '221711288439', 'Dakar', 'pro',
-      '[{"nom":"Riz brise","unite":"sac 50kg","prix":22000,"mots":["riz"]},{"nom":"Huile vegetale","unite":"bidon 20L","prix":25000,"mots":["huile"]},{"nom":"Sucre","unite":"sac 50kg","prix":30000,"mots":["sucre"]},{"nom":"Farine","unite":"sac 50kg","prix":20000,"mots":["farine"]},{"nom":"Mil","unite":"sac 50kg","prix":18000,"mots":["mil"]},{"nom":"Tomate concentree","unite":"carton","prix":15000,"mots":["tomate"]},{"nom":"Savon","unite":"carton","prix":12000,"mots":["savon"]},{"nom":"Lait en poudre","unite":"boite 2.5kg","prix":8500,"mots":["lait"]}]'::jsonb)
+      '[{"nom":"Riz brisé","unite":"sac 50kg","prix":22000,"mots":["riz"]},{"nom":"Huile végétale","unite":"bidon 20L","prix":25000,"mots":["huile"]},{"nom":"Sucre","unite":"sac 50kg","prix":30000,"mots":["sucre"]},{"nom":"Farine","unite":"sac 50kg","prix":20000,"mots":["farine"]},{"nom":"Mil","unite":"sac 50kg","prix":18000,"mots":["mil"]},{"nom":"Tomate concentrée","unite":"carton","prix":15000,"mots":["tomate"]},{"nom":"Savon","unite":"carton","prix":12000,"mots":["savon"]},{"nom":"Lait en poudre","unite":"boite 2.5kg","prix":8500,"mots":["lait"]}]'::jsonb)
     ON CONFLICT (id) DO NOTHING;
   `);
   console.log('✅ Base de données MarchandPro initialisée');
@@ -1894,7 +1894,7 @@ body{font-family:'DM Sans',sans-serif;background:#f5f7f5;color:#1a2e1a;min-heigh
     </div>
     <div class="info-row">
       <div class="info-icon">⭐</div>
-      <div><div class="info-label">Plan</div><div class="info-val"><span class="plan-badge">Plan ${m.plan}</span></div></div>
+      <div><div class="info-label">Plan</div><div class="info-val"><span class="plan-badge">${m.plan === 'pro' ? '⭐ Pro' : m.plan === 'starter' ? '🔵 Starter' : '⚪ Gratuit'}</span></div></div>
     </div>
     <div class="info-row">
       <div class="info-icon">🕐</div>
