@@ -261,6 +261,8 @@ tr:hover td { background:#fafcfa; }
         <option value="cereales">🌿 Céréales</option>
         <option value="viande">🥩 Viande & Volaille</option>
         <option value="emballage">📦 Emballage</option>
+        <option value="boissons">🥤 Boissons</option>
+        <option value="gaz">⛽ Gaz & Énergie</option>
       </select>
     </div>
     <div class="modal-btns">
@@ -425,11 +427,11 @@ async function confirmerSecteur() {
 function getSecteurBadge(secteur) {
   const emojis = { alimentaire:'🌾', menagers:'🧴', poisson:'🐟', pharmacie:'💊',
     quincaillerie:'🔧', telephonie:'📱', textile:'👗', cosmetiques:'💄',
-    cereales:'🌿', viande:'🥩', emballage:'📦' };
+    cereales:'🌿', viande:'🥩', emballage:'📦', boissons:'🥤', gaz:'⛽' };
   const labels = { alimentaire:'Alimentaire', menagers:'Ménagers', poisson:'Poisson & Marée',
     pharmacie:'Pharmacie', quincaillerie:'Quincaillerie', telephonie:'Téléphonie',
     textile:'Textile', cosmetiques:'Cosmétiques', cereales:'Céréales',
-    viande:'Viande & Volaille', emballage:'Emballage' };
+    viande:'Viande & Volaille', emballage:'Emballage', boissons:'Boissons', gaz:'Gaz & Énergie' };
   const emoji = emojis[secteur] || '🏪';
   const label = labels[secteur] || secteur || '—';
   return `<span style="background:#e8f5e9;color:#006633;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700">${emoji} ${label}</span>`;
