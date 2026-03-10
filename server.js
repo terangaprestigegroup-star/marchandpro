@@ -2739,9 +2739,99 @@ app.get('/api/merchants-public', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+
+// ============================================
+// RAPPORT HEBDO WHATSAPP — Chaque lundi 9h
+// ============================================
+async function envoyerRapportHebdo() {
+  try {
+    console.log('📊 Envoi rapports hebdo WhatsApp...');
+    const merchants = await pool.query(`SELECT * FROM merchants`);
+    const maintenant = new Date();
+    const lundiDernier = new Date(maintenant);
+    lundiDernier.setDate(maintenant.getDate() - 7);
+
+    for (const m of merchants.rows) {
+      try {
+        const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+        const phone = m.whatsapp_number || m.phone;
+        if (!phone) continue;
+
+        const stats = await pool.query(`
+          SELECT COUNT(*) as total_commandes,
+            COALESCE(SUM(total), 0) as revenus,
+            COUNT(DISTINCT customer_phone) as clients_actifs
+          FROM orders WHERE merchant_id = $1 AND created_at >= $2
+        `, [m.id, lundiDernier]);
+
+        const s = stats.rows[0];
+        const totalCmds = parseInt(s.total_commandes) || 0;
+        const revenus = parseInt(s.revenus) || 0;
+        const clients = parseInt(s.clients_actifs) || 0;
+
+        const produitStar = await pool.query(`
+          SELECT elem->>'produit' as produit, SUM((elem->>'quantite')::int) as total_qte
+          FROM orders, jsonb_array_elements(items) as elem
+          WHERE merchant_id = $1 AND created_at >= $2
+          AND elem->>'produit' IS NOT NULL AND length(elem->>'produit') > 2
+          GROUP BY elem->>'produit' ORDER BY total_qte DESC LIMIT 1
+        `, [m.id, lundiDernier]);
+
+        const star = produitStar.rows[0];
+        const starText = star ? `⭐ Produit star : *${star.produit}* (${star.total_qte}x)` : '';
+
+        const semPrec = await pool.query(`
+          SELECT COUNT(*) as total FROM orders WHERE merchant_id = $1
+          AND created_at >= $2 AND created_at < $3
+        `, [m.id, new Date(maintenant.getTime() - 14*24*60*60*1000), lundiDernier]);
+
+        const cmdsPrecedentes = parseInt(semPrec.rows[0].total) || 0;
+        let tendance = totalCmds > cmdsPrecedentes ? `📈 +${totalCmds - cmdsPrecedentes} vs semaine dernière`
+          : totalCmds < cmdsPrecedentes ? `📉 -${cmdsPrecedentes - totalCmds} vs semaine dernière`
+          : `➡️ Stable vs semaine dernière`;
+
+        const dateDebut = lundiDernier.toLocaleDateString('fr-FR', {day:'numeric', month:'long'});
+        const dateFin = maintenant.toLocaleDateString('fr-FR', {day:'numeric', month:'long'});
+
+        const message = `📊 *Bilan semaine — ${m.nom_boutique}*\n🗓️ Du ${dateDebut} au ${dateFin}\n\n━━━━━━━━━━━━━━━\n📋 Commandes : *${totalCmds}*\n💰 Revenus : *${revenus.toLocaleString('fr-FR')} FCFA*\n👥 Clients actifs : *${clients}*\n${starText}\n━━━━━━━━━━━━━━━\n${tendance}\n\n🔗 Dashboard :\nhttps://marchandpro-production-b529.up.railway.app/app\n\nBonne semaine ! 💪🇸🇳\n— *MarchandPro*`;
+
+        await envoyerWhatsApp(PHONE_NUMBER_ID, phone, message);
+        console.log(`✅ Rapport hebdo envoyé à ${m.nom_boutique}`);
+        await new Promise(r => setTimeout(r, 2000));
+      } catch(e) { console.error(`❌ Erreur rapport ${m.nom_boutique}:`, e.message); }
+    }
+    console.log('📊 Rapports hebdo terminés');
+  } catch(e) { console.error('❌ Erreur rapport hebdo:', e.message); }
+}
+
+function planifierRapportHebdo() {
+  const now = new Date();
+  const lundi = new Date(now);
+  const jour = now.getDay();
+  const joursAvantLundi = jour === 0 ? 1 : jour === 1 && now.getHours() < 9 ? 0 : 8 - (jour === 0 ? 7 : jour);
+  lundi.setDate(now.getDate() + joursAvantLundi);
+  lundi.setHours(9, 0, 0, 0);
+  const delai = lundi - now;
+  console.log(`📊 Prochain rapport hebdo dans ${Math.round(delai/1000/60/60)}h`);
+  setTimeout(() => {
+    envoyerRapportHebdo();
+    setInterval(envoyerRapportHebdo, 7 * 24 * 60 * 60 * 1000);
+  }, delai);
+}
+
+
+// Route test manuel rapport hebdo
+app.get('/api/rapport-hebdo', async (req, res) => {
+  try {
+    await envoyerRapportHebdo();
+    res.json({ ok: true, message: 'Rapports hebdo envoyés !' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 initDB().then(() => {
   app.listen(process.env.PORT || 3000, () => {
     console.log('🚀 MarchandPro v3.1 démarré sur port ' + (process.env.PORT || 3000));
     planifierRelances();
+    planifierRapportHebdo();
   });
 }).catch(err => console.error('Erreur démarrage:', err));
