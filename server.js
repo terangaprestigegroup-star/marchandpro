@@ -140,6 +140,7 @@ async function initDB() {
     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS referral_code VARCHAR(20);
     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS referral_by INTEGER;
     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS mois_offerts INTEGER DEFAULT 0;
+    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS secteur VARCHAR(50) DEFAULT 'alimentaire';
     INSERT INTO merchants (id, nom_boutique, proprietaire, whatsapp, ville, plan, catalogue)
     VALUES (1, 'MarchandPro Demo', 'Terangaprestige', '221711288439', 'Dakar', 'pro',
       '[{"nom":"Riz brisé","unite":"sac 50kg","prix":22000,"mots":["riz"]},{"nom":"Huile végétale","unite":"bidon 20L","prix":25000,"mots":["huile"]},{"nom":"Sucre","unite":"sac 50kg","prix":30000,"mots":["sucre"]},{"nom":"Farine","unite":"sac 50kg","prix":20000,"mots":["farine"]},{"nom":"Mil","unite":"sac 50kg","prix":18000,"mots":["mil"]},{"nom":"Tomate concentrée","unite":"carton","prix":15000,"mots":["tomate"]},{"nom":"Savon","unite":"carton","prix":12000,"mots":["savon"]},{"nom":"Lait en poudre","unite":"boite 2.5kg","prix":8500,"mots":["lait"]}]'::jsonb)
