@@ -1093,7 +1093,7 @@ app.get('/api/orders', authMiddleware, async (req, res) => {
   res.json(result.rows);
 });
 
-app.put('/api/orders/:id', authMiddleware, async (req, res) => {
+app.put('/api/orders/:id', async (req, res) => {
   const { status } = req.body;
   const result = await pool.query('UPDATE orders SET status=$1 WHERE id=$2 RETURNING *', [status, req.params.id]);
   const order = result.rows[0];
