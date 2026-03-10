@@ -2909,12 +2909,120 @@ function planifierRapportHebdo() {
   }, delai);
 }
 
+// ============================================
+// ALERTE STOCK WHATSAPP — Vérification quotidienne 8h
+// ============================================
+async function verifierStockFaible() {
+  try {
+    console.log('📦 Vérification stocks faibles...');
+    const merchants = await pool.query('SELECT * FROM merchants WHERE actif=true');
+    for (const m of merchants.rows) {
+      if (!m.whatsapp || !m.catalogue) continue;
+      const catalogue = Array.isArray(m.catalogue) ? m.catalogue : JSON.parse(m.catalogue);
+      const SEUIL = m.seuil_stock || 5;
+      const produitsFaibles = catalogue.filter(p => p.stock !== undefined && p.stock <= SEUIL && p.stock >= 0);
+      if (produitsFaibles.length === 0) continue;
+      let msg = `⚠️ *Alerte Stock — ${m.nom_boutique}*\n\n`;
+      msg += `Les produits suivants sont en stock bas :\n\n`;
+      produitsFaibles.forEach(p => {
+        const emoji = p.stock === 0 ? '🔴' : '🟡';
+        msg += `${emoji} *${p.nom}* : ${p.stock === 0 ? 'Rupture totale !' : `${p.stock} unités restantes`}\n`;
+      });
+      msg += `\n📦 Pensez à réapprovisionner dès aujourd'hui !\n\n_MarchandPro · marchandpro.up.railway.app_`;
+      const phone_id = process.env.PHONE_NUMBER_ID;
+      await envoyerWhatsApp(phone_id, m.whatsapp, msg);
+      console.log(`📦 Alerte stock envoyée à ${m.nom_boutique}`);
+    }
+  } catch(e) {
+    console.error('Erreur alerte stock:', e.message);
+  }
+}
+
+function planifierAlerteStock() {
+  const now = new Date();
+  const demain8h = new Date(now);
+  demain8h.setDate(now.getDate() + (now.getHours() >= 8 ? 1 : 0));
+  demain8h.setHours(8, 0, 0, 0);
+  const delai = demain8h - now;
+  console.log(`📦 Prochaine alerte stock dans ${Math.round(delai/1000/60/60)}h`);
+  setTimeout(() => {
+    verifierStockFaible();
+    setInterval(verifierStockFaible, 24 * 60 * 60 * 1000);
+  }, delai);
+}
+
+// ============================================
+// RELANCE CRÉDITS — Chaque vendredi 10h
+// ============================================
+async function envoyerRelanceCredits() {
+  try {
+    console.log('💰 Envoi relances crédits vendredi...');
+    const merchants = await pool.query('SELECT * FROM merchants WHERE actif=true');
+    for (const m of merchants.rows) {
+      const credits = await pool.query(
+        'SELECT * FROM credits WHERE merchant_id=$1 AND montant > 0',
+        [m.id]
+      );
+      if (credits.rows.length === 0) continue;
+      const phone_id = process.env.PHONE_NUMBER_ID;
+      let relances = 0;
+      for (const c of credits.rows) {
+        const msg = `💰 *Rappel de paiement*\n\nBonjour ${c.client_name || ''},\n\nVous avez un crédit en cours chez *${m.nom_boutique}* :\n\n💵 Montant dû : *${Number(c.montant).toLocaleString('fr-FR')} FCFA*\n\nMerci de régulariser dès que possible 🙏\n\n_${m.nom_boutique} · MarchandPro 🇸🇳_`;
+        await envoyerWhatsApp(phone_id, c.client_phone, msg);
+        relances++;
+      }
+      // Notifier aussi le grossiste
+      if (m.whatsapp && relances > 0) {
+        const totalDu = credits.rows.reduce((s, c) => s + Number(c.montant), 0);
+        await envoyerWhatsApp(phone_id, m.whatsapp,
+          `💰 *Relances crédits envoyées*\n\n${relances} client(s) relancé(s)\nTotal dû : *${totalDu.toLocaleString('fr-FR')} FCFA*\n\n_MarchandPro · Vendredi automatique_`
+        );
+      }
+      console.log(`💰 ${relances} relances crédit envoyées pour ${m.nom_boutique}`);
+    }
+  } catch(e) {
+    console.error('Erreur relance crédits:', e.message);
+  }
+}
+
+function planifierRelanceCredits() {
+  const now = new Date();
+  const vendredi = new Date(now);
+  const jour = now.getDay(); // 0=dim, 5=ven
+  const joursAvantVendredi = jour <= 5 ? 5 - jour : 6;
+  vendredi.setDate(now.getDate() + (jour === 5 && now.getHours() < 10 ? 0 : joursAvantVendredi || 7));
+  vendredi.setHours(10, 0, 0, 0);
+  const delai = vendredi - now;
+  console.log(`💰 Prochaine relance crédits dans ${Math.round(delai/1000/60/60)}h`);
+  setTimeout(() => {
+    envoyerRelanceCredits();
+    setInterval(envoyerRelanceCredits, 7 * 24 * 60 * 60 * 1000);
+  }, delai);
+}
+
+
 
 // Route test manuel rapport hebdo
 app.get('/api/rapport-hebdo', adminMiddleware, async (req, res) => {
   try {
     await envoyerRapportHebdo();
     res.json({ ok: true, message: 'Rapports hebdo envoyés !' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Route test manuel alerte stock
+app.get('/api/alerte-stock', adminMiddleware, async (req, res) => {
+  try {
+    await verifierStockFaible();
+    res.json({ ok: true, message: 'Alertes stock vérifiées !' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Route test manuel relance crédits
+app.get('/api/relance-credits', adminMiddleware, async (req, res) => {
+  try {
+    await envoyerRelanceCredits();
+    res.json({ ok: true, message: 'Relances crédits envoyées !' });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -3250,9 +3358,11 @@ function planifierRelancesCredit() {
 
 initDB().then(() => {
   app.listen(process.env.PORT || 3000, () => {
-    console.log('🚀 MarchandPro v3.1 démarré sur port ' + (process.env.PORT || 3000));
+    console.log('🚀 MarchandPro v3.2 démarré sur port ' + (process.env.PORT || 3000));
     planifierRelances();
     planifierRapportHebdo();
     planifierRelancesCredit();
+    planifierAlerteStock();
+    planifierRelanceCredits();
   });
 }).catch(err => console.error('Erreur démarrage:', err));
