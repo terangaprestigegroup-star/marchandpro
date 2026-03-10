@@ -144,6 +144,10 @@ async function initDB() {
     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS pin VARCHAR(10) DEFAULT NULL;
     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS seuil_stock INTEGER DEFAULT 5;
     ALTER TABLE orders ADD COLUMN IF NOT EXISTS livreur_id INTEGER DEFAULT NULL;
+    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS type_compte VARCHAR(20) DEFAULT 'grossiste';
+    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS commission_pct DECIMAL DEFAULT 1.5;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS fournisseur_id INTEGER DEFAULT NULL;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS commission_montant DECIMAL DEFAULT 0;
     -- CRÉDIT CLIENT
     CREATE TABLE IF NOT EXISTS credits (id SERIAL PRIMARY KEY, merchant_id INTEGER NOT NULL, client_phone VARCHAR(50) NOT NULL, client_name VARCHAR(100), montant DECIMAL DEFAULT 0, notes TEXT, created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW());
     CREATE TABLE IF NOT EXISTS credits_historique (id SERIAL PRIMARY KEY, credit_id INTEGER, merchant_id INTEGER, client_phone VARCHAR(50), type VARCHAR(20), montant DECIMAL, notes TEXT, created_at TIMESTAMP DEFAULT NOW());
@@ -3318,6 +3322,256 @@ async function relancerPaiementsEnRetard() {
   } catch(e) { console.error('Erreur relance échelonné:', e.message); }
 }
 
+// ============================================
+// MULTI-VILLES
+// ============================================
+
+// Liste des villes disponibles avec stats
+app.get('/api/villes', async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT ville, COUNT(*) as nb_merchants, COUNT(CASE WHEN type_compte='fournisseur' THEN 1 END) as nb_fournisseurs
+      FROM merchants WHERE actif=true
+      GROUP BY ville ORDER BY nb_merchants DESC
+    `);
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Grossistes par ville
+app.get('/api/merchants/ville/:ville', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT id, nom_boutique, proprietaire, ville, secteur, plan, type_compte, latitude, longitude
+       FROM merchants WHERE LOWER(ville) LIKE $1 AND actif=true AND type_compte='grossiste'
+       ORDER BY plan DESC, nom_boutique`,
+      [`%${req.params.ville.toLowerCase()}%`]
+    );
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================
+// VERSION FOURNISSEURS
+// ============================================
+
+// Liste des fournisseurs (public)
+app.get('/api/fournisseurs', async (req, res) => {
+  try {
+    const ville = req.query.ville;
+    const secteur = req.query.secteur;
+    let q = `SELECT id, nom_boutique, proprietaire, ville, secteur, plan, whatsapp
+             FROM merchants WHERE type_compte='fournisseur' AND actif=true`;
+    const params = [];
+    if (ville) { q += ` AND LOWER(ville) LIKE $${params.length+1}`; params.push(`%${ville.toLowerCase()}%`); }
+    if (secteur) { q += ` AND secteur=$${params.length+1}`; params.push(secteur); }
+    q += ' ORDER BY nom_boutique';
+    const r = await pool.query(q, params);
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Fournisseur d'un grossiste (ses fournisseurs)
+app.get('/api/fournisseurs/merchant/:merchant_id', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT DISTINCT m.id, m.nom_boutique, m.ville, m.secteur, m.whatsapp,
+              COUNT(o.id) as nb_commandes, SUM(o.total) as total_achats
+       FROM merchants m
+       LEFT JOIN orders o ON o.fournisseur_id=m.id AND o.merchant_id=$1
+       WHERE m.type_compte='fournisseur' AND m.actif=true
+       GROUP BY m.id ORDER BY total_achats DESC NULLS LAST`,
+      [req.params.merchant_id]
+    );
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Commande d'un grossiste vers un fournisseur
+app.post('/api/commande-fournisseur', async (req, res) => {
+  try {
+    const { merchant_id, fournisseur_id, items, notes } = req.body;
+    if (!merchant_id || !fournisseur_id || !items?.length) {
+      return res.status(400).json({ error: 'Données manquantes' });
+    }
+    const total = items.reduce((s, i) => s + (i.prix * i.quantite), 0);
+    const commission = Math.round(total * 1.5 / 100);
+    const ref = 'CF-' + Date.now().toString(36).toUpperCase();
+
+    // Créer la commande
+    const r = await pool.query(
+      `INSERT INTO orders (merchant_id, fournisseur_id, items, total, status, reference, commission_montant, notes)
+       VALUES ($1,$2,$3,$4,'nouveau',$5,$6,$7) RETURNING *`,
+      [merchant_id, fournisseur_id, JSON.stringify(items), total, ref, commission, notes]
+    );
+    const order = r.rows[0];
+
+    // Récupérer infos
+    const merchantRes = await pool.query('SELECT * FROM merchants WHERE id=$1', [merchant_id]);
+    const fournisseurRes = await pool.query('SELECT * FROM merchants WHERE id=$1', [fournisseur_id]);
+    const m = merchantRes.rows[0];
+    const f = fournisseurRes.rows[0];
+
+    // Notifier le fournisseur
+    if (f?.whatsapp) {
+      let produits = items.map(i => `• ${i.quantite}x ${i.nom} — ${Number(i.prix*i.quantite).toLocaleString('fr-FR')} FCFA`).join('\n');
+      const msg = `🏭 *Nouvelle commande grossiste !*\n\n` +
+        `De : *${m?.nom_boutique}* (${m?.ville})\nRéf : *${ref}*\n\n${produits}\n\n` +
+        `━━━━━━━━━━━━\n💰 Total : *${Number(total).toLocaleString('fr-FR')} FCFA*\n` +
+        `${notes ? `📝 Note : ${notes}\n` : ''}` +
+        `━━━━━━━━━━━━\n\n_MarchandPro 🇸🇳_`;
+      await envoyerWhatsApp(process.env.PHONE_NUMBER_ID, f.whatsapp, msg);
+    }
+
+    // Confirmer au grossiste
+    if (m?.whatsapp) {
+      const msg = `✅ *Commande fournisseur envoyée !*\n\nRéf : *${ref}*\nFournisseur : *${f?.nom_boutique}*\nTotal : *${Number(total).toLocaleString('fr-FR')} FCFA*\n\n_En attente de confirmation du fournisseur_\n\n_MarchandPro 🇸🇳_`;
+      await envoyerWhatsApp(process.env.PHONE_NUMBER_ID, m.whatsapp, msg);
+    }
+
+    res.json({ ok: true, order, commission_appliquee: commission });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Stats commissions (admin)
+app.get('/api/admin/commissions', adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT DATE_TRUNC('month', created_at) as mois,
+             COUNT(*) as nb_commandes,
+             SUM(total) as volume_total,
+             SUM(commission_montant) as commissions_total
+      FROM orders WHERE fournisseur_id IS NOT NULL
+      GROUP BY mois ORDER BY mois DESC LIMIT 12
+    `);
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Dashboard fournisseur
+app.get('/fournisseur/:id', async (req, res) => {
+  try {
+    const fRes = await pool.query('SELECT * FROM merchants WHERE id=$1 AND type_compte=$2', [req.params.id, 'fournisseur']);
+    const f = fRes.rows[0];
+    if (!f) return res.status(404).send('Fournisseur introuvable');
+
+    const commandes = await pool.query(
+      `SELECT o.*, m.nom_boutique as acheteur FROM orders o
+       LEFT JOIN merchants m ON m.id=o.merchant_id
+       WHERE o.fournisseur_id=$1 ORDER BY o.created_at DESC LIMIT 20`,
+      [req.params.id]
+    );
+
+    const stats = await pool.query(
+      `SELECT COUNT(*) as total, SUM(total) as revenus,
+              COUNT(CASE WHEN status='livré' THEN 1 END) as livrees,
+              COUNT(CASE WHEN status='nouveau' THEN 1 END) as nouvelles
+       FROM orders WHERE fournisseur_id=$1`,
+      [req.params.id]
+    );
+    const s = stats.rows[0];
+
+    const getSecteurLabel = (sec) => {
+      const map = { alimentaire:'🌾 Alimentaire', boissons:'🥤 Boissons', poisson:'🐟 Poisson', pharmacie:'💊 Pharmacie', quincaillerie:'🔧 Quincaillerie', telephonie:'📱 Téléphonie', textile:'👗 Textile', cosmetiques:'💄 Cosmétiques', cereales:'🌿 Céréales', viande:'🥩 Viande', emballage:'📦 Emballage', menagers:'🧴 Ménagers', gaz:'⛽ Gaz' };
+      return map[sec] || sec;
+    };
+
+    res.send(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard Fournisseur — ${f.nom_boutique}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#f4f0ff;color:#0d0d1f}
+.header{background:linear-gradient(135deg,#4527A0,#5E35B1);padding:18px;color:white}
+.header h1{font-size:18px;font-weight:900}
+.header p{font-size:11px;opacity:0.7;margin-top:2px}
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:14px}
+.kpi{background:white;border-radius:12px;padding:14px;border-left:3px solid #5E35B1}
+.kpi-val{font-size:22px;font-weight:900;color:#5E35B1}
+.kpi-lbl{font-size:9px;color:#888;margin-top:2px}
+.section{padding:0 14px 14px}
+.section-title{font-size:13px;font-weight:900;margin-bottom:10px;color:#0d0d1f}
+.cmd{background:white;border-radius:12px;padding:12px 14px;margin-bottom:8px}
+.cmd-ref{font-size:13px;font-weight:900;color:#5E35B1}
+.cmd-acheteur{font-size:11px;color:#888;margin-top:2px}
+.cmd-total{font-size:14px;font-weight:900;color:#006633;margin-top:4px}
+.badge{font-size:9px;font-weight:800;padding:3px 8px;border-radius:8px}
+.b-new{background:#fff9e6;color:#cc9900}
+.b-livre{background:#e8f5e9;color:#006633}
+.b-route{background:#e3f2fd;color:#1565C0}
+.btn-conf{background:#5E35B1;color:white;border:none;padding:6px 14px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🏭 ${f.nom_boutique}</h1>
+  <p>${getSecteurLabel(f.secteur)} · 📍 ${f.ville} · Fournisseur certifié</p>
+</div>
+<div class="kpis">
+  <div class="kpi"><div class="kpi-val">${s.total||0}</div><div class="kpi-lbl">📋 Commandes reçues</div></div>
+  <div class="kpi"><div class="kpi-val">${Number(s.revenus||0).toLocaleString('fr-FR')}F</div><div class="kpi-lbl">💰 Volume total</div></div>
+  <div class="kpi"><div class="kpi-val">${s.nouvelles||0}</div><div class="kpi-lbl">🕐 Nouvelles</div></div>
+  <div class="kpi"><div class="kpi-val">${s.livrees||0}</div><div class="kpi-lbl">✅ Livrées</div></div>
+</div>
+<div class="section">
+  <div class="section-title">📋 Commandes récentes</div>
+  ${commandes.rows.length === 0 ? '<p style="color:#888;font-size:13px;text-align:center;padding:20px">Aucune commande pour l\'instant</p>' :
+    commandes.rows.map(o => {
+      const badge = o.status === 'livré' ? 'b-livre' : o.status === 'en route' ? 'b-route' : 'b-new';
+      const label = o.status === 'livré' ? '✅ Livré' : o.status === 'en route' ? '🚚 Route' : '🕐 Nouveau';
+      return `<div class="cmd">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="cmd-ref">${o.reference||'#'+o.id}</div>
+          <span class="badge ${badge}">${label}</span>
+        </div>
+        <div class="cmd-acheteur">🏪 ${o.acheteur||'Grossiste'}</div>
+        <div class="cmd-total">💰 ${Number(o.total).toLocaleString('fr-FR')} FCFA</div>
+        ${o.status === 'nouveau' ? `<button class="btn-conf" onclick="confirmer(${o.id},this)">✅ Confirmer commande</button>` : ''}
+      </div>`;
+    }).join('')}
+</div>
+<script>
+async function confirmer(id, btn) {
+  btn.disabled=true; btn.textContent='⏳...';
+  const r = await fetch('/api/orders/'+id, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'confirmé',merchant_id:${f.id}})});
+  const d = await r.json();
+  if(d.id||d.ok) { btn.textContent='✅ Confirmé!'; btn.style.background='#006633'; }
+  else { btn.disabled=false; btn.textContent='✅ Confirmer commande'; }
+}
+</script>
+</body>
+</html>`);
+  } catch(e) { res.status(500).send('Erreur: ' + e.message); }
+});
+
+// Inscrire un fournisseur
+app.post('/api/inscription-fournisseur', async (req, res) => {
+  try {
+    const { nom_boutique, proprietaire, whatsapp, ville, secteur } = req.body;
+    if (!nom_boutique || !whatsapp) return res.status(400).json({ error: 'Données manquantes' });
+    const wa = whatsapp.replace(/\D/g, '');
+    const referralCode = 'FOUR' + Math.random().toString(36).substring(2,7).toUpperCase();
+    const r = await pool.query(
+      `INSERT INTO merchants (nom_boutique, proprietaire, whatsapp, ville, plan, type_compte, catalogue, referral_code)
+       VALUES ($1,$2,$3,$4,'pro','fournisseur','[]',$5) RETURNING *`,
+      [nom_boutique, proprietaire||'', wa, ville||'Dakar', referralCode]
+    );
+    const f = r.rows[0];
+    // Message de bienvenue
+    const msg = `🏭 *Bienvenue sur MarchandPro Fournisseurs !*\n\n` +
+      `Bonjour ${proprietaire||nom_boutique} 👋\n\n` +
+      `Votre espace fournisseur est actif :\n` +
+      `🔗 Dashboard : marchandpro.up.railway.app/fournisseur/${f.id}\n\n` +
+      `Les grossistes sénégalais peuvent maintenant vous commander directement via WhatsApp.\n\n` +
+      `_MarchandPro · Terangaprestige Group 🇸🇳_`;
+    await envoyerWhatsApp(process.env.PHONE_NUMBER_ID, wa, msg);
+    res.json({ ok: true, fournisseur: f });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // Reset PIN merchant (admin uniquement)
 app.post('/api/admin/reset-pin', adminMiddleware, async (req, res) => {
   try {
@@ -3627,6 +3881,81 @@ function planifierRelancesCredit() {
 }
 
 initDB().then(() => {
+
+// Page publique fournisseurs
+app.get('/fournisseurs', async (req, res) => {
+  try {
+    const villesRes = await pool.query(`SELECT DISTINCT ville FROM merchants WHERE type_compte='fournisseur' AND actif=true ORDER BY ville`);
+    const villes = villesRes.rows.map(r => r.ville);
+    const fournisseursRes = await pool.query(`SELECT * FROM merchants WHERE type_compte='fournisseur' AND actif=true ORDER BY nom_boutique`);
+    const fournisseurs = fournisseursRes.rows;
+    const getSecteurLabel = (s) => {
+      const map = { alimentaire:'🌾 Alimentaire', boissons:'🥤 Boissons', poisson:'🐟 Poisson', pharmacie:'💊 Pharmacie', quincaillerie:'🔧 Quincaillerie', telephonie:'📱 Téléphonie', textile:'👗 Textile', cosmetiques:'💄 Cosmétiques', cereales:'🌿 Céréales', viande:'🥩 Viande', emballage:'📦 Emballage', menagers:'🧴 Ménagers', gaz:'⛽ Gaz' };
+      return map[s] || s;
+    };
+    res.send(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fournisseurs — MarchandPro</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:#f4f0ff;color:#0d0d1f}
+.header{background:linear-gradient(135deg,#4527A0,#5E35B1);padding:24px;color:white;text-align:center}
+.header h1{font-size:24px;font-weight:900;margin-bottom:4px}
+.header p{font-size:13px;opacity:0.8}
+.filtres{padding:16px;display:flex;gap:10px;flex-wrap:wrap}
+.filtre-btn{background:white;border:2px solid #d1c4e9;color:#5E35B1;padding:8px 16px;border-radius:50px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit}
+.filtre-btn.active{background:#5E35B1;color:white;border-color:#5E35B1}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;padding:0 16px 24px}
+.card{background:white;border-radius:16px;padding:18px;box-shadow:0 2px 12px rgba(69,39,160,0.08)}
+.card-nom{font-size:16px;font-weight:900;color:#4527A0;margin-bottom:4px}
+.card-meta{font-size:11px;color:#888;margin-bottom:12px}
+.card-secteur{display:inline-block;background:#f4f0ff;color:#5E35B1;font-size:11px;font-weight:800;padding:4px 12px;border-radius:20px;margin-bottom:12px}
+.card-btn{display:block;background:linear-gradient(135deg,#4527A0,#5E35B1);color:white;text-align:center;padding:12px;border-radius:10px;font-size:13px;font-weight:800;text-decoration:none;border:none;cursor:pointer;width:100%;font-family:inherit}
+.badge-pro{background:#FFD700;color:#1a1a1a;font-size:9px;font-weight:900;padding:2px 8px;border-radius:8px;margin-left:6px}
+</style>
+</head>
+<body>
+<div class="header">
+  <div style="font-size:40px;margin-bottom:8px">🏭</div>
+  <h1>Fournisseurs MarchandPro</h1>
+  <p>${fournisseurs.length} fournisseur(s) certifié(s) · Commandez directement via WhatsApp</p>
+</div>
+<div class="filtres">
+  <button class="filtre-btn active" onclick="filtrer('tous',this)">🌍 Tous</button>
+  ${villes.map(v => `<button class="filtre-btn" onclick="filtrer('${v}',this)">📍 ${v}</button>`).join('')}
+</div>
+<div class="grid" id="grid">
+  ${fournisseurs.length === 0
+    ? '<div style="text-align:center;padding:40px;color:#888;grid-column:1/-1"><div style="font-size:48px">🏭</div><p style="margin-top:12px">Aucun fournisseur pour l\'instant</p></div>'
+    : fournisseurs.map(f => `
+    <div class="card" data-ville="${f.ville}">
+      <div class="card-nom">${f.nom_boutique}${f.plan==='pro'?'<span class="badge-pro">PRO</span>':''}</div>
+      <div class="card-meta">📍 ${f.ville} · 👤 ${f.proprietaire}</div>
+      <div class="card-secteur">${getSecteurLabel(f.secteur)}</div>
+      <button class="card-btn" onclick="contacter('${f.whatsapp}','${f.nom_boutique}')">📲 Contacter sur WhatsApp</button>
+    </div>`).join('')}
+</div>
+<script>
+function filtrer(ville,btn){
+  document.querySelectorAll('.filtre-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.card').forEach(c=>{
+    c.style.display=ville==='tous'||c.dataset.ville===ville?'':'none';
+  });
+}
+function contacter(phone,nom){
+  const msg=encodeURIComponent('Bonjour, je suis grossiste sur MarchandPro. Je souhaite commander chez '+nom+'.');
+  window.open('https://wa.me/'+phone+'?text='+msg,'_blank');
+}
+</script>
+</body>
+</html>`);
+  } catch(e) { res.status(500).send('Erreur: '+e.message); }
+});
   app.listen(process.env.PORT || 3000, () => {
     console.log('🚀 MarchandPro v3.2 démarré sur port ' + (process.env.PORT || 3000));
     planifierRelances();
