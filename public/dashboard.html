@@ -566,6 +566,17 @@
     </div>
   </div>
 
+  <!-- FOURNISSEURS -->
+  <div class="table-full" style="margin-bottom:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="card-title" style="margin:0">🏭 Mes Fournisseurs</div>
+      <button onclick="commanderFournisseur()" style="background:linear-gradient(135deg,#4527A0,#5E35B1);color:white;border:none;padding:8px 18px;border-radius:50px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">+ Commander</button>
+    </div>
+    <div id="fournisseurs-liste" style="background:#f4f0ff;border:1.5px solid #d1c4e9;border-radius:14px;padding:16px">
+      <div style="text-align:center;color:#888;font-size:13px">⏳ Chargement fournisseurs...</div>
+    </div>
+  </div>
+
   <div class="table-full" style="margin-bottom:0">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div class="card-title" style="margin:0">🏷️ Promotion Flash</div>
@@ -1362,6 +1373,85 @@ async function solderPaiement(orderId) {
   if (d.ok) { alert('✅ Paiement soldé ! Client notifié.'); chargerEchelonnes(); }
 }
 
+// ============================================
+// FOURNISSEURS
+// ============================================
+async function chargerFournisseurs() {
+  try {
+    const r = await fetch(`${API}/api/fournisseurs/merchant/${MERCHANT_ID}`);
+    const fournisseurs = await r.json();
+    const el = document.getElementById('fournisseurs-liste');
+    if (!fournisseurs.length) {
+      el.innerHTML = `<div style="text-align:center;padding:16px">
+        <div style="font-size:32px;margin-bottom:8px">🏭</div>
+        <div style="font-size:13px;color:#888;margin-bottom:12px">Aucun fournisseur lié — découvrez les fournisseurs MarchandPro</div>
+        <button onclick="voirTousFournisseurs()" style="background:#5E35B1;color:white;border:none;padding:10px 20px;border-radius:50px;font-size:12px;font-weight:800;cursor:pointer">🔍 Voir tous les fournisseurs</button>
+      </div>`;
+      return;
+    }
+    el.innerHTML = fournisseurs.map(f => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #d1c4e9">
+        <div>
+          <div style="font-weight:800;font-size:13px">🏭 ${f.nom_boutique}</div>
+          <div style="font-size:11px;color:#888">📍 ${f.ville} · ${f.nb_commandes||0} commande(s) · ${Number(f.total_achats||0).toLocaleString('fr-FR')} FCFA</div>
+        </div>
+        <button onclick="passerCommande(${f.id},'${f.nom_boutique}')" style="background:#5E35B1;color:white;border:none;font-size:10px;font-weight:800;padding:6px 12px;border-radius:10px;cursor:pointer">📦 Commander</button>
+      </div>`).join('') +
+      `<div style="margin-top:10px;text-align:center">
+        <button onclick="voirTousFournisseurs()" style="background:#f4f0ff;color:#5E35B1;border:none;font-size:11px;font-weight:800;padding:8px 16px;border-radius:10px;cursor:pointer">🔍 Voir tous les fournisseurs</button>
+      </div>`;
+  } catch(e) { console.error(e); }
+}
+
+function voirTousFournisseurs() {
+  window.open(`${API}/fournisseurs`, '_blank');
+}
+
+async function passerCommande(fournisseurId, nomFournisseur) {
+  const produit = prompt(`Commander chez ${nomFournisseur}\n\nNom du produit :`);
+  if (!produit) return;
+  const qte = prompt('Quantité :');
+  if (!qte || isNaN(qte)) return;
+  const prix = prompt('Prix unitaire (FCFA) :');
+  if (!prix || isNaN(prix)) return;
+  const notes = prompt('Note (optionnel) :') || '';
+  try {
+    const r = await fetch(`${API}/api/commande-fournisseur`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        merchant_id: MERCHANT_ID,
+        fournisseur_id: fournisseurId,
+        items: [{ nom: produit, quantite: parseInt(qte), prix: parseFloat(prix) }],
+        notes
+      })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      alert(`✅ Commande envoyée à ${nomFournisseur} !\n\nTotal : ${Number(d.order.total).toLocaleString('fr-FR')} FCFA\nCommission MarchandPro : ${Number(d.commission_appliquee).toLocaleString('fr-FR')} FCFA\n\nLe fournisseur a été notifié sur WhatsApp !`);
+      chargerFournisseurs();
+    }
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+async function commanderFournisseur() {
+  // Charger liste fournisseurs disponibles
+  try {
+    const r = await fetch(`${API}/api/fournisseurs`);
+    const fournisseurs = await r.json();
+    if (!fournisseurs.length) {
+      alert('Aucun fournisseur disponible pour l\'instant.\n\nContactez MarchandPro pour référencer votre fournisseur 📞');
+      return;
+    }
+    const liste = fournisseurs.map((f, i) => `${i+1}. ${f.nom_boutique} (${f.ville})`).join('\n');
+    const choix = prompt(`Choisissez un fournisseur (numéro) :\n\n${liste}`);
+    if (!choix || isNaN(choix)) return;
+    const f = fournisseurs[parseInt(choix)-1];
+    if (!f) return;
+    passerCommande(f.id, f.nom_boutique);
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
 // Vérifier login au démarrage
 if (checkLogin()) {
   loadDashboard();
@@ -1369,6 +1459,7 @@ if (checkLogin()) {
   chargerMarges();
   chargerLivreurs();
   chargerEchelonnes();
+  chargerFournisseurs();
 }
 setInterval(() => { if (getSession()) loadDashboard(); }, 30000);
 </script>
