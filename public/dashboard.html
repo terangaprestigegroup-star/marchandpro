@@ -543,6 +543,29 @@
       <div style="display:inline-block;background:#006633;color:white;font-size:12px;font-weight:800;padding:5px 14px;border-radius:20px">✅ Certifié MarchandPro</div>
     </div>
   </div>
+
+  <!-- MULTI-LIVREURS -->
+  <div class="table-full" style="margin-bottom:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="card-title" style="margin:0">🚚 Mes Livreurs</div>
+      <button onclick="ajouterLivreur()" style="background:linear-gradient(135deg,#1565C0,#1976D2);color:white;border:none;padding:8px 18px;border-radius:50px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">+ Ajouter livreur</button>
+    </div>
+    <div id="livreurs-liste" style="background:#f0f4ff;border:1.5px solid #bbdefb;border-radius:14px;padding:16px">
+      <div style="text-align:center;color:#888;font-size:13px">⏳ Chargement livreurs...</div>
+    </div>
+  </div>
+
+  <!-- PAIEMENTS ÉCHELONNÉS -->
+  <div class="table-full" style="margin-bottom:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="card-title" style="margin:0">💳 Paiements Échelonnés</div>
+      <button onclick="ouvrirModalEchelonne()" style="background:linear-gradient(135deg,#4527A0,#5E35B1);color:white;border:none;padding:8px 18px;border-radius:50px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">+ Nouveau</button>
+    </div>
+    <div id="echelonnes-liste" style="background:#f3e5f5;border:1.5px solid #ce93d8;border-radius:14px;padding:16px">
+      <div style="text-align:center;color:#888;font-size:13px">⏳ Chargement paiements...</div>
+    </div>
+  </div>
+
   <div class="table-full" style="margin-bottom:0">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div class="card-title" style="margin:0">🏷️ Promotion Flash</div>
@@ -1238,11 +1261,114 @@ function voirCertificat() {
   window.open(`${API}/api/certificat/${MERCHANT_ID}/view`, '_blank');
 }
 
+// ============================================
+// MULTI-LIVREURS
+// ============================================
+async function chargerLivreurs() {
+  try {
+    const r = await fetch(`${API}/api/livreurs/${MERCHANT_ID}`);
+    const livreurs = await r.json();
+    const el = document.getElementById('livreurs-liste');
+    if (!livreurs.length) {
+      el.innerHTML = '<div style="text-align:center;color:#888;font-size:13px;padding:10px">Aucun livreur — ajoutez votre premier livreur</div>';
+      return;
+    }
+    el.innerHTML = livreurs.map(l => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #bbdefb">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;border-radius:50%;background:#1565C0;color:white;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900">${l.nom[0].toUpperCase()}</div>
+          <div>
+            <div style="font-weight:800;font-size:13px">${l.nom}</div>
+            <div style="font-size:11px;color:#888">📍 ${l.zone || 'Zone non définie'} · 📱 ${l.phone || 'N/A'}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <a href="/livreur/${MERCHANT_ID}/${l.id}?pin=${l.pin}" target="_blank" style="background:#e3f2fd;color:#1565C0;font-size:10px;font-weight:800;padding:4px 10px;border-radius:10px;text-decoration:none">🔗 Voir</a>
+          <button onclick="supprimerLivreur(${l.id})" style="background:#fce4ec;color:#c0392b;border:none;font-size:10px;font-weight:800;padding:4px 10px;border-radius:10px;cursor:pointer">🗑️</button>
+        </div>
+      </div>`).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function ajouterLivreur() {
+  const nom = prompt('Nom du livreur :');
+  if (!nom) return;
+  const phone = prompt('Numéro WhatsApp (ex: 221701234567) :');
+  const zone = prompt('Zone de livraison (ex: Médina, Plateau) :');
+  const pin = prompt('PIN du livreur (4 chiffres) :') || '0000';
+  try {
+    const r = await fetch(`${API}/api/livreurs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ merchant_id: MERCHANT_ID, nom, phone, zone, pin })
+    });
+    const d = await r.json();
+    if (d.ok) { alert(`✅ Livreur ${nom} ajouté !`); chargerLivreurs(); }
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+async function supprimerLivreur(id) {
+  if (!confirm('Supprimer ce livreur ?')) return;
+  await fetch(`${API}/api/livreurs/${id}`, { method: 'DELETE' });
+  chargerLivreurs();
+}
+
+// ============================================
+// PAIEMENTS ÉCHELONNÉS
+// ============================================
+async function chargerEchelonnes() {
+  try {
+    const r = await fetch(`${API}/api/paiements-echelonnes/${MERCHANT_ID}`);
+    const paiements = await r.json();
+    const el = document.getElementById('echelonnes-liste');
+    if (!paiements.length) {
+      el.innerHTML = '<div style="text-align:center;color:#888;font-size:13px;padding:10px">Aucun paiement échelonné en cours</div>';
+      return;
+    }
+    el.innerHTML = paiements.map(p => `
+      <div style="padding:10px 0;border-bottom:1px solid #ce93d8">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-weight:800;font-size:13px">${p.reference || '#'+p.order_id}</div>
+          <span style="background:${p.statut==='soldé'?'#e8f5e9':'#fff3e0'};color:${p.statut==='soldé'?'#006633':'#e65100'};font-size:10px;font-weight:800;padding:3px 9px;border-radius:10px">${p.statut==='soldé'?'✅ Soldé':'⏳ En cours'}</span>
+        </div>
+        <div style="font-size:11px;color:#888">Total: ${Number(p.montant_total).toLocaleString('fr-FR')} F · Acompte: ${Number(p.acompte).toLocaleString('fr-FR')} F · Reste: <b style="color:#c0392b">${Number(p.reste).toLocaleString('fr-FR')} F</b></div>
+        ${p.statut !== 'soldé' && p.reste > 0 ? `<button onclick="solderPaiement(${p.order_id})" style="margin-top:6px;background:#006633;color:white;border:none;font-size:10px;font-weight:800;padding:4px 12px;border-radius:10px;cursor:pointer">✅ Marquer soldé</button>` : ''}
+      </div>`).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function ouvrirModalEchelonne() {
+  const orderId = prompt('Numéro de commande (ID) :');
+  if (!orderId) return;
+  const pct = prompt('Pourcentage acompte (défaut: 50%) :') || '50';
+  try {
+    const r = await fetch(`${API}/api/paiement-echelonne`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: parseInt(orderId), merchant_id: MERCHANT_ID, pourcentage_acompte: parseInt(pct) })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      alert(`✅ Paiement échelonné créé !\nAcompte: ${Number(d.acompte).toLocaleString('fr-FR')} FCFA\nReste: ${Number(d.reste).toLocaleString('fr-FR')} FCFA\n\nLe client a été notifié sur WhatsApp !`);
+      chargerEchelonnes();
+    }
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+async function solderPaiement(orderId) {
+  if (!confirm('Confirmer que le reste a été payé ?')) return;
+  const r = await fetch(`${API}/api/paiement-echelonne/${orderId}/solder`, { method: 'POST' });
+  const d = await r.json();
+  if (d.ok) { alert('✅ Paiement soldé ! Client notifié.'); chargerEchelonnes(); }
+}
+
 // Vérifier login au démarrage
 if (checkLogin()) {
   loadDashboard();
   chargerCredits();
   chargerMarges();
+  chargerLivreurs();
+  chargerEchelonnes();
 }
 setInterval(() => { if (getSession()) loadDashboard(); }, 30000);
 </script>
