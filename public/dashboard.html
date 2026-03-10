@@ -504,6 +504,45 @@
   </div>
 
   <!-- PROMOTION FLASH -->
+
+  <!-- CRÉDITS CLIENTS -->
+  <div class="table-full" style="margin-bottom:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="card-title" style="margin:0">💰 Crédits Clients</div>
+      <button onclick="ouvrirModalCredit()" style="background:linear-gradient(135deg,#c0392b,#e74c3c);color:white;border:none;padding:8px 18px;border-radius:50px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">+ Ajouter crédit</button>
+    </div>
+    <div id="credits-liste" style="background:#fff9f9;border:1.5px solid #fce4ec;border-radius:14px;padding:16px">
+      <div style="text-align:center;color:#888;font-size:13px">⏳ Chargement crédits...</div>
+    </div>
+    <div id="credits-total" style="margin-top:10px;text-align:right;font-size:13px;font-weight:800;color:#c0392b"></div>
+  </div>
+
+  <!-- MARGES -->
+  <div class="table-full" style="margin-bottom:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="card-title" style="margin:0">📊 Marges & Bénéfices</div>
+    </div>
+    <div id="marges-liste" style="background:#f9fcf9;border:1.5px solid #c8e6c9;border-radius:14px;padding:16px">
+      <div style="text-align:center;color:#888;font-size:13px">⏳ Chargement marges...</div>
+    </div>
+  </div>
+
+  <!-- CERTIFICAT -->
+  <div class="table-full" style="margin-bottom:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="card-title" style="margin:0">🏆 Certificat Grossiste</div>
+      <div style="display:flex;gap:8px">
+        <button onclick="genererCertificat()" style="background:#006633;color:white;border:none;padding:8px 18px;border-radius:50px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">🏆 Générer</button>
+        <button onclick="voirCertificat()" style="background:#e8f5e9;color:#006633;border:none;padding:8px 18px;border-radius:50px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">👁️ Voir</button>
+      </div>
+    </div>
+    <div style="background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border:2px solid #c8e6c9;border-radius:14px;padding:20px;text-align:center">
+      <div style="font-size:40px;margin-bottom:8px">🏆</div>
+      <div style="font-weight:800;font-size:16px;color:#006633;margin-bottom:6px">Certificat de Grossiste Digital</div>
+      <div style="font-size:13px;color:#5a7a5a;margin-bottom:14px">Prouvez votre sérieux avec un certificat officiel MarchandPro</div>
+      <div style="display:inline-block;background:#006633;color:white;font-size:12px;font-weight:800;padding:5px 14px;border-radius:20px">✅ Certifié MarchandPro</div>
+    </div>
+  </div>
   <div class="table-full" style="margin-bottom:0">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div class="card-title" style="margin:0">🏷️ Promotion Flash</div>
@@ -590,7 +629,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const API = 'https://marchandpro-production-b529.up.railway.app';
+const API = 'https://marchandpro.up.railway.app';
 
 // ============================================
 // SYSTÈME LOGIN PIN
@@ -1073,9 +1112,137 @@ async function changerStatut(id, statut) {
   } catch(e) { toast('❌ Erreur: ' + e.message); }
 }
 
+// ============================================
+// CRÉDITS CLIENTS
+// ============================================
+async function chargerCredits() {
+  try {
+    const mid = MERCHANT_ID;
+    const r = await fetch(`${API}/api/credits/${mid}`);
+    const credits = await r.json();
+    const el = document.getElementById('credits-liste');
+    const tot = document.getElementById('credits-total');
+    if (!credits.length) {
+      el.innerHTML = '<div style="text-align:center;color:#888;font-size:13px;padding:10px">✅ Aucun crédit en cours</div>';
+      tot.textContent = '';
+      return;
+    }
+    const total = credits.reduce((s, c) => s + Number(c.montant), 0);
+    el.innerHTML = credits.map(c => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #fce4ec">
+        <div>
+          <div style="font-weight:800;font-size:13px">${c.client_name || c.client_phone}</div>
+          <div style="font-size:11px;color:#888">${c.client_phone}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:900;font-size:15px;color:#c0392b">${Number(c.montant).toLocaleString('fr-FR')} FCFA</div>
+          <button onclick="rembourserCredit('${c.client_phone}','${c.client_name}')" style="background:#e8f5e9;color:#006633;border:none;font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;cursor:pointer;margin-top:3px">✅ Rembours.</button>
+        </div>
+      </div>`).join('');
+    tot.innerHTML = `💵 Total crédits : <span style="color:#c0392b">${total.toLocaleString('fr-FR')} FCFA</span>`;
+  } catch(e) { console.error(e); }
+}
+
+function ouvrirModalCredit() {
+  const nom = prompt('Nom du client :');
+  if (!nom) return;
+  const phone = prompt('Numéro WhatsApp (ex: 221701234567) :');
+  if (!phone) return;
+  const montant = prompt('Montant du crédit (FCFA) :');
+  if (!montant || isNaN(montant)) return;
+  ajouterCredit(phone, nom, parseFloat(montant), 'ajout');
+}
+
+async function ajouterCredit(phone, nom, montant, type) {
+  try {
+    const r = await fetch(`${API}/api/credits`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ merchant_id: MERCHANT_ID, client_phone: phone, client_name: nom, montant, type })
+    });
+    const data = await r.json();
+    if (data.ok) { alert('✅ Crédit enregistré !'); chargerCredits(); }
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+async function rembourserCredit(phone, nom) {
+  const montant = prompt(`Montant remboursé par ${nom} (FCFA) :`);
+  if (!montant || isNaN(montant)) return;
+  await ajouterCredit(phone, nom, parseFloat(montant), 'remboursement');
+}
+
+// ============================================
+// MARGES & BÉNÉFICES
+// ============================================
+async function chargerMarges() {
+  try {
+    const r = await fetch(`${API}/api/marges/${MERCHANT_ID}`);
+    const marges = await r.json();
+    const el = document.getElementById('marges-liste');
+    if (!marges.length) {
+      el.innerHTML = '<div style="text-align:center;color:#888;font-size:13px;padding:10px">Aucun produit trouvé</div>';
+      return;
+    }
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 80px;gap:8px;padding:8px 0;border-bottom:2px solid #c8e6c9;font-size:10px;font-weight:800;color:#5a7a5a">
+        <div>Produit</div><div>Prix vente</div><div>Prix achat</div><div>Bénéfice</div><div>Marge</div>
+      </div>` +
+      marges.map(m => `
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 80px;gap:8px;padding:9px 0;border-bottom:1px solid #f0f0f0;align-items:center">
+        <div style="font-weight:700;font-size:12px">${m.nom}</div>
+        <div style="font-size:12px">${Number(m.prix_vente).toLocaleString('fr-FR')} F</div>
+        <div>
+          ${m.prix_achat > 0
+            ? `<span style="font-size:12px">${Number(m.prix_achat).toLocaleString('fr-FR')} F</span>`
+            : `<button onclick="saisirPrixAchat('${m.nom}')" style="background:#e8f5e9;color:#006633;border:none;font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;cursor:pointer">+ Saisir</button>`
+          }
+        </div>
+        <div style="font-weight:800;font-size:12px;color:${m.benefice_unitaire > 0 ? '#006633' : '#c0392b'}">${m.benefice_unitaire > 0 ? '+' : ''}${Number(m.benefice_unitaire).toLocaleString('fr-FR')} F</div>
+        <div>
+          ${m.marge_pct !== null
+            ? `<span style="background:${m.alerte ? '#fff3e0' : '#e8f5e9'};color:${m.alerte ? '#e65100' : '#006633'};font-size:11px;font-weight:800;padding:3px 8px;border-radius:10px">${m.marge_pct}%</span>`
+            : `<span style="color:#aaa;font-size:11px">—</span>`
+          }
+        </div>
+      </div>`).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function saisirPrixAchat(nomProduit) {
+  const prix = prompt(`Prix d'achat pour "${nomProduit}" (FCFA) :`);
+  if (!prix || isNaN(prix)) return;
+  try {
+    await fetch(`${API}/api/products/${MERCHANT_ID}/${encodeURIComponent(nomProduit)}/marge`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prix_achat: parseFloat(prix) })
+    });
+    chargerMarges();
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+// ============================================
+// CERTIFICAT GROSSISTE
+// ============================================
+async function genererCertificat() {
+  try {
+    const r = await fetch(`${API}/api/certificat/${MERCHANT_ID}`, { method: 'POST' });
+    const data = await r.json();
+    if (data.ok) {
+      alert(`✅ Certificat généré !\nNuméro : ${data.numero}`);
+    }
+  } catch(e) { alert('Erreur : ' + e.message); }
+}
+
+function voirCertificat() {
+  window.open(`${API}/api/certificat/${MERCHANT_ID}/view`, '_blank');
+}
+
 // Vérifier login au démarrage
 if (checkLogin()) {
   loadDashboard();
+  chargerCredits();
+  chargerMarges();
 }
 setInterval(() => { if (getSession()) loadDashboard(); }, 30000);
 </script>
