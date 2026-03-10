@@ -300,7 +300,7 @@ function tFaq(el) {
   document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
   if (!wasOpen) item.classList.add('open');
 }
-fetch('https://marchandpro-production-b529.up.railway.app/api/merchants')
+fetch('https://marchandpro.up.railway.app/api/merchants')
   .then(r=>r.json()).then(d=>{ if(d.length) document.getElementById('stat-m').textContent=d.length+'+'; }).catch(()=>{});
 </script>
 </body>
