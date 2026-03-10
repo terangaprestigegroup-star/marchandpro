@@ -141,6 +141,7 @@ async function initDB() {
     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS referral_by INTEGER;
     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS mois_offerts INTEGER DEFAULT 0;
     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS secteur VARCHAR(50) DEFAULT 'alimentaire';
+    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS pin VARCHAR(10) DEFAULT NULL;
     INSERT INTO merchants (id, nom_boutique, proprietaire, whatsapp, ville, plan, catalogue)
     VALUES (1, 'MarchandPro Demo', 'Terangaprestige', '221711288439', 'Dakar', 'pro',
       '[{"nom":"Riz brisé","unite":"sac 50kg","prix":22000,"mots":["riz"]},{"nom":"Huile végétale","unite":"bidon 20L","prix":25000,"mots":["huile"]},{"nom":"Sucre","unite":"sac 50kg","prix":30000,"mots":["sucre"]},{"nom":"Farine","unite":"sac 50kg","prix":20000,"mots":["farine"]},{"nom":"Mil","unite":"sac 50kg","prix":18000,"mots":["mil"]},{"nom":"Tomate concentrée","unite":"carton","prix":15000,"mots":["tomate"]},{"nom":"Savon","unite":"carton","prix":12000,"mots":["savon"]},{"nom":"Lait en poudre","unite":"boite 2.5kg","prix":8500,"mots":["lait"]}]'::jsonb)
@@ -377,6 +378,33 @@ function authMiddleware(req, res, next) {
   } catch {
     res.status(401).json({ error: 'Token invalide' });
   }
+}
+
+// Middleware admin — protège les routes sensibles
+function adminMiddleware(req, res, next) {
+  const secret = req.query.secret || req.headers['x-admin-secret'];
+  const ADMIN_SECRET = process.env.ADMIN_SECRET || 'marchandpro-admin-2026';
+  if (secret !== ADMIN_SECRET) {
+    return res.status(403).json({ error: 'Accès refusé — secret admin requis' });
+  }
+  next();
+}
+
+// Middleware merchant — vérifie que le merchant accède à ses propres données
+async function merchantMiddleware(req, res, next) {
+  try {
+    const merchantId = req.body.merchant_id || req.params.merchant_id || req.query.merchant_id;
+    const pin = req.headers['x-merchant-pin'] || req.query.pin;
+    if (!merchantId) return next(); // Routes sans merchant_id passent
+    if (pin) {
+      const result = await pool.query('SELECT * FROM merchants WHERE id=$1', [merchantId]);
+      const m = result.rows[0];
+      if (m && m.pin && m.pin !== pin) {
+        return res.status(403).json({ error: 'PIN incorrect' });
+      }
+    }
+    next();
+  } catch(e) { next(); }
 }
 
 async function envoyerWhatsApp(phone_id, to, message) {
@@ -1094,8 +1122,17 @@ app.get('/api/orders', authMiddleware, async (req, res) => {
 });
 
 app.put('/api/orders/:id', async (req, res) => {
-  const { status } = req.body;
-  const result = await pool.query('UPDATE orders SET status=$1 WHERE id=$2 RETURNING *', [status, req.params.id]);
+  const { status, merchant_id } = req.body;
+  // Vérifier que la commande appartient au merchant si merchant_id fourni
+  let query = 'UPDATE orders SET status=$1 WHERE id=$2';
+  let params = [status, req.params.id];
+  if (merchant_id) {
+    query += ' AND merchant_id=$3';
+    params.push(merchant_id);
+  }
+  query += ' RETURNING *';
+  const result = await pool.query(query, params);
+  if (!result.rows[0]) return res.status(404).json({ error: 'Commande introuvable ou accès refusé' });
   const order = result.rows[0];
 
   // ── NOTIFICATIONS STATUT CLIENT ──
@@ -1509,7 +1546,7 @@ app.post('/api/merchants/register', async (req, res) => {
 });
 
 // Générer codes parrainage manquants
-app.get('/api/admin/generer-codes', async (req, res) => {
+app.get('/api/admin/generer-codes', adminMiddleware, async (req, res) => {
   try {
     const merchants = await pool.query("SELECT * FROM merchants WHERE referral_code IS NULL OR referral_code = ''");
     let updated = 0;
@@ -2668,7 +2705,7 @@ function planifierRelances() {
 // CARTE DES GROSSISTES
 // ============================================
 // Route admin — corriger noms produits merchant #1
-app.get('/api/admin/fix-produits', async (req, res) => {
+app.get('/api/admin/fix-produits', adminMiddleware, async (req, res) => {
   try {
     await pool.query(`
       UPDATE merchants SET catalogue = '[
@@ -2821,10 +2858,51 @@ function planifierRapportHebdo() {
 
 
 // Route test manuel rapport hebdo
-app.get('/api/rapport-hebdo', async (req, res) => {
+app.get('/api/rapport-hebdo', adminMiddleware, async (req, res) => {
   try {
     await envoyerRapportHebdo();
     res.json({ ok: true, message: 'Rapports hebdo envoyés !' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================
+// SÉCURITÉ — LOGIN MERCHANT PAR PIN
+// ============================================
+
+// Vérifier PIN merchant
+app.post('/api/merchant/login', async (req, res) => {
+  try {
+    const { merchant_id, pin } = req.body;
+    if (!merchant_id || !pin) return res.status(400).json({ error: 'merchant_id et pin requis' });
+    const result = await pool.query('SELECT id, nom_boutique, pin, plan FROM merchants WHERE id=$1', [merchant_id]);
+    const m = result.rows[0];
+    if (!m) return res.status(404).json({ error: 'Merchant introuvable' });
+    // Si pas de PIN configuré → accepter n'importe quel PIN (premier accès)
+    if (!m.pin) {
+      return res.json({ ok: true, merchant_id: m.id, nom: m.nom_boutique, plan: m.plan, first_login: true });
+    }
+    if (m.pin !== pin) return res.status(401).json({ error: 'PIN incorrect' });
+    res.json({ ok: true, merchant_id: m.id, nom: m.nom_boutique, plan: m.plan });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Définir/changer PIN merchant
+app.post('/api/merchant/set-pin', async (req, res) => {
+  try {
+    const { merchant_id, pin_actuel, nouveau_pin } = req.body;
+    if (!merchant_id || !nouveau_pin) return res.status(400).json({ error: 'Données manquantes' });
+    if (nouveau_pin.length !== 4 || !/^\d+$/.test(nouveau_pin)) {
+      return res.status(400).json({ error: 'PIN doit être 4 chiffres' });
+    }
+    const result = await pool.query('SELECT pin FROM merchants WHERE id=$1', [merchant_id]);
+    const m = result.rows[0];
+    if (!m) return res.status(404).json({ error: 'Merchant introuvable' });
+    // Si PIN déjà défini → vérifier l'ancien
+    if (m.pin && m.pin !== pin_actuel) {
+      return res.status(401).json({ error: 'PIN actuel incorrect' });
+    }
+    await pool.query('UPDATE merchants SET pin=$1 WHERE id=$2', [nouveau_pin, merchant_id]);
+    res.json({ ok: true, message: 'PIN mis à jour !' });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
