@@ -302,6 +302,34 @@ const SECTEURS = {
       { nom: 'Étiquettes adhésives', unite: 'lot 1000 pièces', prix: 8000, mots: ['etiquette','adhesif'] },
       { nom: 'Ruban adhésif', unite: 'lot 12 rouleaux', prix: 6000, mots: ['ruban','scotch','adhesif'] },
     ]
+  },
+  boissons: {
+    nom: 'Boissons',
+    emoji: '🥤',
+    catalogue: [
+      { nom: 'Eau minérale 1.5L', unite: 'palette 96 bouteilles', prix: 18000, mots: ['eau','minerale','kirene','cristalline'] },
+      { nom: 'Eau minérale 0.5L', unite: 'carton 24 bouteilles', prix: 4800, mots: ['eau','petite','demi'] },
+      { nom: 'Jus de fruits Vitalait', unite: 'carton 24 briques', prix: 12000, mots: ['jus','vitalait','brique'] },
+      { nom: 'Bissap concentré', unite: 'bidon 5L', prix: 8500, mots: ['bissap','concentre'] },
+      { nom: 'Gingembre concentré', unite: 'bidon 5L', prix: 9000, mots: ['gingembre','ginger'] },
+      { nom: 'Coca-Cola', unite: 'casier 24 bouteilles', prix: 9600, mots: ['coca','cola','soda'] },
+      { nom: 'Lait Candia', unite: 'carton 24 briques', prix: 14400, mots: ['lait','candia'] },
+      { nom: 'Yogourt Kirène', unite: 'carton 12 pots', prix: 6000, mots: ['yaourt','yogourt','kirene'] },
+    ]
+  },
+  gaz: {
+    nom: 'Gaz & Énergie',
+    emoji: '⛽',
+    catalogue: [
+      { nom: 'Bouteille gaz 6kg', unite: 'pièce', prix: 5500, mots: ['gaz','6kg','petite bouteille'] },
+      { nom: 'Bouteille gaz 12kg', unite: 'pièce', prix: 10500, mots: ['gaz','12kg','grande bouteille'] },
+      { nom: 'Bouteille gaz 38kg', unite: 'pièce', prix: 32000, mots: ['gaz','38kg','industriel'] },
+      { nom: 'Pétrole lampant', unite: 'bidon 20L', prix: 18000, mots: ['petrole','lampant','lampe'] },
+      { nom: 'Charbon de bois', unite: 'sac 50kg', prix: 8000, mots: ['charbon','bois'] },
+      { nom: 'Bougie', unite: 'carton 144 pièces', prix: 7200, mots: ['bougie','bougies'] },
+      { nom: 'Régulateur gaz', unite: 'pièce', prix: 4500, mots: ['regulateur','detendeur'] },
+      { nom: 'Tuyau flexible gaz', unite: 'pièce 1.5m', prix: 3500, mots: ['tuyau','flexible','gaz'] },
+    ]
   }
 };
 
@@ -1731,19 +1759,20 @@ app.get('/boutique/:slug', async (req, res) => {
     alimentaire: '#006633', menagers: '#1565C0', poisson: '#00838F',
     pharmacie: '#AD1457', quincaillerie: '#E65100', telephonie: '#4527A0',
     textile: '#558B2F', cosmetiques: '#880E4F',
-    cereales: '#5D4037', viande: '#B71C1C', emballage: '#37474F'
+    cereales: '#5D4037', viande: '#B71C1C', emballage: '#37474F', boissons: '#0277BD', gaz: '#F57F17'
   };
   const SECTEUR_EMOJIS = {
     alimentaire:'🌾', menagers:'🧴', poisson:'🐟',
     pharmacie:'💊', quincaillerie:'🔧', telephonie:'📱',
     textile:'👗', cosmetiques:'💄',
-    cereales:'🌿', viande:'🥩', emballage:'📦'
+    cereales:'🌿', viande:'🥩', emballage:'📦', boissons:'🥤', gaz:'⛽'
   };
   const SECTEUR_LABELS = {
     alimentaire:'Alimentaire', menagers:'Ménagers', poisson:'Poisson & Marée',
     pharmacie:'Pharmacie', quincaillerie:'Quincaillerie', telephonie:'Téléphonie',
     textile:'Textile', cosmetiques:'Cosmétiques',
-    cereales:'Céréales', viande:'Viande & Volaille', emballage:'Emballage'
+    cereales:'Céréales', viande:'Viande & Volaille', emballage:'Emballage',
+    boissons:'Boissons', gaz:'Gaz & Énergie'
   };
 
   const couleur = SECTEUR_COLORS[m.secteur] || '#006633';
@@ -2016,6 +2045,8 @@ input:focus, select:focus { border-color:#006633; }
     <button class="secteur-btn" onclick="selSecteur('pharmacie',this)"><span class="secteur-emoji">💊</span>Pharmacie</button>
     <button class="secteur-btn" onclick="selSecteur('quincaillerie',this)"><span class="secteur-emoji">🔧</span>Quincaillerie</button>
     <button class="secteur-btn" onclick="selSecteur('telephonie',this)"><span class="secteur-emoji">📱</span>Téléphonie</button>
+    <button class="secteur-btn" onclick="selSecteur('boissons',this)"><span class="secteur-emoji">🥤</span>Boissons</button>
+    <button class="secteur-btn" onclick="selSecteur('gaz',this)"><span class="secteur-emoji">⛽</span>Gaz & Énergie</button>
     <button class="secteur-btn" onclick="selSecteur('textile',this)" style="grid-column:1/-1"><span class="secteur-emoji">👗</span>Textile</button>
   </div>
   <input type="hidden" id="secteur" value="alimentaire" />
@@ -2112,7 +2143,7 @@ app.put('/api/merchants/:id/plan', async (req, res) => {
 app.put('/api/merchants/:id/secteur', async (req, res) => {
   try {
     const { secteur } = req.body;
-    const secteurs = ['alimentaire','menagers','poisson','pharmacie','quincaillerie','telephonie','textile','cosmetiques','cereales','viande','emballage'];
+    const secteurs = ['alimentaire','menagers','poisson','pharmacie','quincaillerie','telephonie','textile','cosmetiques','cereales','viande','emballage','boissons','gaz'];
     if (!secteurs.includes(secteur)) return res.status(400).json({ error: 'Secteur invalide' });
     await pool.query('UPDATE merchants SET secteur=$1 WHERE id=$2', [secteur, req.params.id]);
     res.json({ ok: true });
