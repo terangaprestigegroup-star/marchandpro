@@ -386,6 +386,49 @@
 </head>
 <body>
 
+<!-- LOGIN OVERLAY -->
+<div id="login-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:white;border-radius:20px;padding:32px 28px;width:90%;max-width:360px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.4)">
+    <div style="font-size:40px;margin-bottom:12px">🔐</div>
+    <div style="font-size:20px;font-weight:900;color:#0d1f0d;margin-bottom:4px">MarchandPro</div>
+    <div style="font-size:13px;color:#5a7a5a;margin-bottom:24px">Entrez votre PIN pour accéder à votre dashboard</div>
+    
+    <!-- Section PIN existant -->
+    <div id="pin-section">
+      <input id="pin-input" type="password" maxlength="4" inputmode="numeric" pattern="[0-9]*"
+        placeholder="• • • •"
+        style="width:100%;border:2px solid #e0ece0;border-radius:12px;padding:14px;font-size:24px;text-align:center;letter-spacing:8px;font-family:inherit;outline:none;margin-bottom:12px"
+        onkeydown="if(event.key==='Enter') submitPin()">
+      <button id="pin-btn" onclick="submitPin()"
+        style="width:100%;background:#006633;color:white;border:none;padding:14px;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit">
+        🔓 Accéder
+      </button>
+      <div style="margin-top:10px;font-size:11px;color:#888">
+        Première connexion ? PIN par défaut : <b>1234</b>
+      </div>
+    </div>
+    
+    <!-- Section nouveau PIN (premier accès) -->
+    <div id="set-pin-section" style="display:none">
+      <div style="background:#e8f5e9;border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:#006633;font-weight:700">
+        🎉 Bienvenue ! Définissez votre PIN personnel
+      </div>
+      <input id="new-pin-input" type="password" maxlength="4" inputmode="numeric" pattern="[0-9]*"
+        placeholder="Nouveau PIN (4 chiffres)"
+        style="width:100%;border:2px solid #e0ece0;border-radius:12px;padding:12px;font-size:18px;text-align:center;letter-spacing:6px;font-family:inherit;outline:none;margin-bottom:10px">
+      <input id="confirm-pin-input" type="password" maxlength="4" inputmode="numeric" pattern="[0-9]*"
+        placeholder="Confirmer PIN"
+        style="width:100%;border:2px solid #e0ece0;border-radius:12px;padding:12px;font-size:18px;text-align:center;letter-spacing:6px;font-family:inherit;outline:none;margin-bottom:12px">
+      <button onclick="submitNewPin()"
+        style="width:100%;background:#006633;color:white;border:none;padding:14px;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit">
+        ✅ Définir mon PIN
+      </button>
+    </div>
+    
+    <div id="pin-error" style="display:none;margin-top:12px;background:#fce4ec;color:#c0392b;padding:10px;border-radius:10px;font-size:13px;font-weight:700"></div>
+  </div>
+</div>
+
 <nav class="sidebar">
   <div class="logo">
     <div class="logo-icon">🛒</div>
@@ -416,6 +459,7 @@
     <div style="display:flex;gap:10px">
       <button onclick="voirBilan()" style="background:#1565C0;color:white;border:none;padding:10px 18px;border-radius:50px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📊 Bilan</button>
       <button class="refresh-btn" onclick="loadDashboard()">🔄 Actualiser</button>
+      <button class="refresh-btn" onclick="deconnexion()" style="background:#c0392b;margin-left:8px">🔒 Déconnexion</button>
     </div>
   </div>
   <!-- WhatsApp Status -->
@@ -547,6 +591,131 @@
 
 <script>
 const API = 'https://marchandpro-production-b529.up.railway.app';
+
+// ============================================
+// SYSTÈME LOGIN PIN
+// ============================================
+const urlParams = new URLSearchParams(window.location.search);
+const MERCHANT_ID = urlParams.get('merchant_id') || 1;
+
+function getSession() {
+  try {
+    const s = sessionStorage.getItem('mp_session');
+    return s ? JSON.parse(s) : null;
+  } catch { return null; }
+}
+
+function setSession(data) {
+  try { sessionStorage.setItem('mp_session', JSON.stringify(data)); } catch {}
+}
+
+function clearSession() {
+  try { sessionStorage.removeItem('mp_session'); } catch {}
+}
+
+function checkLogin() {
+  const session = getSession();
+  if (!session || session.merchant_id != MERCHANT_ID) {
+    showLoginModal();
+    return false;
+  }
+  return true;
+}
+
+function showLoginModal() {
+  document.getElementById('login-overlay').style.display = 'flex';
+}
+
+function hideLoginModal() {
+  document.getElementById('login-overlay').style.display = 'none';
+}
+
+async function submitPin() {
+  const pin = document.getElementById('pin-input').value;
+  const btn = document.getElementById('pin-btn');
+  const err = document.getElementById('pin-error');
+  
+  if (!pin || pin.length !== 4) {
+    err.textContent = '⚠️ Entrez votre PIN à 4 chiffres';
+    err.style.display = 'block';
+    return;
+  }
+  
+  btn.textContent = '⏳ Vérification...';
+  btn.disabled = true;
+  err.style.display = 'none';
+  
+  try {
+    const r = await fetch(`${API}/api/merchant/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ merchant_id: MERCHANT_ID, pin })
+    });
+    const data = await r.json();
+    
+    if (data.ok) {
+      setSession({ merchant_id: MERCHANT_ID, pin, nom: data.nom });
+      if (data.first_login) {
+        document.getElementById('set-pin-section').style.display = 'block';
+        document.getElementById('pin-section').style.display = 'none';
+        err.style.display = 'none';
+      } else {
+        hideLoginModal();
+        loadDashboard();
+      }
+    } else {
+      err.textContent = '❌ ' + (data.error || 'PIN incorrect');
+      err.style.display = 'block';
+    }
+  } catch(e) {
+    err.textContent = '❌ Erreur réseau';
+    err.style.display = 'block';
+  }
+  
+  btn.textContent = '🔓 Accéder';
+  btn.disabled = false;
+}
+
+async function submitNewPin() {
+  const nouveau = document.getElementById('new-pin-input').value;
+  const confirm = document.getElementById('confirm-pin-input').value;
+  const err = document.getElementById('pin-error');
+  
+  if (nouveau !== confirm) {
+    err.textContent = '⚠️ Les PINs ne correspondent pas';
+    err.style.display = 'block';
+    return;
+  }
+  if (!/^\d{4}$/.test(nouveau)) {
+    err.textContent = '⚠️ PIN doit être 4 chiffres';
+    err.style.display = 'block';
+    return;
+  }
+  
+  try {
+    const r = await fetch(`${API}/api/merchant/set-pin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ merchant_id: MERCHANT_ID, nouveau_pin: nouveau })
+    });
+    const data = await r.json();
+    if (data.ok) {
+      setSession({ merchant_id: MERCHANT_ID, pin: nouveau });
+      hideLoginModal();
+      loadDashboard();
+    }
+  } catch(e) {
+    err.textContent = '❌ Erreur';
+    err.style.display = 'block';
+  }
+}
+
+function deconnexion() {
+  clearSession();
+  showLoginModal();
+}
+
+
 
 const PRODUITS_EMOJIS = {
   'riz':'🌾','huile':'🫙','sucre':'🍚','farine':'🥖',
@@ -904,8 +1073,11 @@ async function changerStatut(id, statut) {
   } catch(e) { toast('❌ Erreur: ' + e.message); }
 }
 
-loadDashboard();
-setInterval(loadDashboard, 30000);
+// Vérifier login au démarrage
+if (checkLogin()) {
+  loadDashboard();
+}
+setInterval(() => { if (getSession()) loadDashboard(); }, 30000);
 </script>
 </body>
 </html>
