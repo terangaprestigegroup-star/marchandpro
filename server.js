@@ -142,11 +142,15 @@ async function initDB() {
     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS mois_offerts INTEGER DEFAULT 0;
     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS secteur VARCHAR(50) DEFAULT 'alimentaire';
     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS pin VARCHAR(10) DEFAULT NULL;
+    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS seuil_stock INTEGER DEFAULT 5;
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS livreur_id INTEGER DEFAULT NULL;
     -- CRÉDIT CLIENT
     CREATE TABLE IF NOT EXISTS credits (id SERIAL PRIMARY KEY, merchant_id INTEGER NOT NULL, client_phone VARCHAR(50) NOT NULL, client_name VARCHAR(100), montant DECIMAL DEFAULT 0, notes TEXT, created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW());
     CREATE TABLE IF NOT EXISTS credits_historique (id SERIAL PRIMARY KEY, credit_id INTEGER, merchant_id INTEGER, client_phone VARCHAR(50), type VARCHAR(20), montant DECIMAL, notes TEXT, created_at TIMESTAMP DEFAULT NOW());
     ALTER TABLE products ADD COLUMN IF NOT EXISTS prix_achat DECIMAL DEFAULT 0;
     CREATE TABLE IF NOT EXISTS certificats (id SERIAL PRIMARY KEY, merchant_id INTEGER UNIQUE NOT NULL, numero VARCHAR(20) UNIQUE NOT NULL, date_emission TIMESTAMP DEFAULT NOW(), actif BOOLEAN DEFAULT true);
+    CREATE TABLE IF NOT EXISTS livreurs (id SERIAL PRIMARY KEY, merchant_id INTEGER NOT NULL, nom VARCHAR(100) NOT NULL, phone VARCHAR(20), pin VARCHAR(10), zone VARCHAR(100), actif BOOLEAN DEFAULT true, created_at TIMESTAMP DEFAULT NOW());
+    CREATE TABLE IF NOT EXISTS paiements_echelonnes (id SERIAL PRIMARY KEY, order_id INTEGER NOT NULL, merchant_id INTEGER NOT NULL, client_phone VARCHAR(50), montant_total DECIMAL, acompte DECIMAL, reste DECIMAL, statut VARCHAR(20) DEFAULT 'acompte_paye', date_limite TIMESTAMP, created_at TIMESTAMP DEFAULT NOW());
     INSERT INTO merchants (id, nom_boutique, proprietaire, whatsapp, ville, plan, catalogue)
     VALUES (1, 'MarchandPro Demo', 'Terangaprestige', '221711288439', 'Dakar', 'pro',
       '[{"nom":"Riz brisé","unite":"sac 50kg","prix":22000,"mots":["riz"]},{"nom":"Huile végétale","unite":"bidon 20L","prix":25000,"mots":["huile"]},{"nom":"Sucre","unite":"sac 50kg","prix":30000,"mots":["sucre"]},{"nom":"Farine","unite":"sac 50kg","prix":20000,"mots":["farine"]},{"nom":"Mil","unite":"sac 50kg","prix":18000,"mots":["mil"]},{"nom":"Tomate concentrée","unite":"carton","prix":15000,"mots":["tomate"]},{"nom":"Savon","unite":"carton","prix":12000,"mots":["savon"]},{"nom":"Lait en poudre","unite":"boite 2.5kg","prix":8500,"mots":["lait"]}]'::jsonb)
@@ -3048,6 +3052,272 @@ app.post('/api/merchant/login', async (req, res) => {
 });
 
 // Définir/changer PIN merchant
+// ============================================
+// MULTI-LIVREURS
+// ============================================
+
+// Lister livreurs d'un merchant
+app.get('/api/livreurs/:merchant_id', async (req, res) => {
+  try {
+    const r = await pool.query('SELECT * FROM livreurs WHERE merchant_id=$1 AND actif=true ORDER BY nom', [req.params.merchant_id]);
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Ajouter un livreur
+app.post('/api/livreurs', async (req, res) => {
+  try {
+    const { merchant_id, nom, phone, pin, zone } = req.body;
+    if (!merchant_id || !nom) return res.status(400).json({ error: 'merchant_id et nom requis' });
+    const r = await pool.query(
+      'INSERT INTO livreurs (merchant_id, nom, phone, pin, zone) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+      [merchant_id, nom, phone, pin || '0000', zone]
+    );
+    res.json({ ok: true, livreur: r.rows[0] });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Modifier un livreur
+app.put('/api/livreurs/:id', async (req, res) => {
+  try {
+    const { nom, phone, pin, zone, actif } = req.body;
+    const r = await pool.query(
+      'UPDATE livreurs SET nom=COALESCE($1,nom), phone=COALESCE($2,phone), pin=COALESCE($3,pin), zone=COALESCE($4,zone), actif=COALESCE($5,actif) WHERE id=$6 RETURNING *',
+      [nom, phone, pin, zone, actif, req.params.id]
+    );
+    res.json({ ok: true, livreur: r.rows[0] });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Supprimer un livreur
+app.delete('/api/livreurs/:id', async (req, res) => {
+  try {
+    await pool.query('UPDATE livreurs SET actif=false WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Assigner commande à un livreur
+app.post('/api/livreurs/:livreur_id/assigner/:order_id', async (req, res) => {
+  try {
+    await pool.query('UPDATE orders SET livreur_id=$1, status=$2 WHERE id=$3', [req.params.livreur_id, 'en route', req.params.order_id]);
+    // Notifier le livreur
+    const livreur = await pool.query('SELECT * FROM livreurs WHERE id=$1', [req.params.livreur_id]);
+    const order = await pool.query('SELECT * FROM orders WHERE id=$1', [req.params.order_id]);
+    const l = livreur.rows[0];
+    const o = order.rows[0];
+    if (l?.phone) {
+      const msg = `🚚 *Nouvelle livraison assignée !*\n\nCommande : *${o.reference || '#'+o.id}*\n📍 Adresse : ${o.delivery_address || 'Non précisée'}\n💰 Montant : *${Number(o.total).toLocaleString('fr-FR')} FCFA*\n\nBonne route ! 💪🇸🇳`;
+      await envoyerWhatsApp(process.env.PHONE_NUMBER_ID, l.phone, msg);
+    }
+    res.json({ ok: true, message: 'Commande assignée au livreur' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Stats livreur
+app.get('/api/livreurs/:livreur_id/stats', async (req, res) => {
+  try {
+    const total = await pool.query('SELECT COUNT(*) FROM orders WHERE livreur_id=$1', [req.params.livreur_id]);
+    const livrees = await pool.query("SELECT COUNT(*) FROM orders WHERE livreur_id=$1 AND status='livré'", [req.params.livreur_id]);
+    const enCours = await pool.query("SELECT COUNT(*) FROM orders WHERE livreur_id=$1 AND status='en route'", [req.params.livreur_id]);
+    const livreur = await pool.query('SELECT * FROM livreurs WHERE id=$1', [req.params.livreur_id]);
+    res.json({
+      livreur: livreur.rows[0],
+      total: parseInt(total.rows[0].count),
+      livrees: parseInt(livrees.rows[0].count),
+      en_cours: parseInt(enCours.rows[0].count)
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Tableau livreur avec PIN (accès individuel)
+app.get('/livreur/:merchant_id/:livreur_id', async (req, res) => {
+  try {
+    const { merchant_id, livreur_id } = req.params;
+    const pin = req.query.pin;
+    const livreurRes = await pool.query('SELECT * FROM livreurs WHERE id=$1 AND merchant_id=$2', [livreur_id, merchant_id]);
+    const l = livreurRes.rows[0];
+    if (!l) return res.status(404).send('Livreur introuvable');
+    if (l.pin && pin !== l.pin) return res.status(401).send(`
+      <html><body style="font-family:sans-serif;text-align:center;padding:40px;background:#f4f7f4">
+      <h2>🔐 Accès Livreur</h2>
+      <p>Bonjour ${l.nom} — entrez votre PIN</p>
+      <form method="GET">
+        <input type="password" name="pin" maxlength="4" placeholder="PIN" style="padding:12px;font-size:20px;text-align:center;border:2px solid #006633;border-radius:10px;width:120px;letter-spacing:8px">
+        <br><br>
+        <button type="submit" style="background:#006633;color:white;border:none;padding:12px 28px;border-radius:50px;font-size:16px;font-weight:700;cursor:pointer">Accéder</button>
+      </form>
+      </body></html>`);
+    const ordersRes = await pool.query(
+      `SELECT * FROM orders WHERE merchant_id=$1 AND livreur_id=$2 AND status IN ('confirmé','en route') ORDER BY created_at DESC`,
+      [merchant_id, livreur_id]
+    );
+    const merchantRes = await pool.query('SELECT * FROM merchants WHERE id=$1', [merchant_id]);
+    const m = merchantRes.rows[0];
+    const orders = ordersRes.rows;
+    res.send(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Livraisons — ${l.nom}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#f0f4ff;color:#0d0d2d}
+.header{background:linear-gradient(135deg,#1565C0,#1976D2);padding:16px;color:white}
+.header h1{font-size:18px;font-weight:900}
+.header p{font-size:12px;opacity:0.7;margin-top:2px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px}
+.stat{background:white;border-radius:12px;padding:14px;text-align:center;border-left:3px solid #1565C0}
+.stat-val{font-size:28px;font-weight:900;color:#1565C0}
+.stat-lbl{font-size:10px;color:#888;margin-top:2px}
+.card{background:white;border-radius:14px;margin:0 12px 12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.card-header{padding:12px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f5f5f5}
+.card-ref{font-size:14px;font-weight:900;color:#1565C0}
+.card-body{padding:12px 14px}
+.adresse{background:#f0f4ff;border-radius:8px;padding:10px;font-size:12px;margin-bottom:8px}
+.produits{font-size:11px;color:#888;margin-bottom:6px}
+.total{font-size:15px;font-weight:900;color:#006633;margin-bottom:10px}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn-livrer{background:#006633;color:white;border:none;padding:12px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit}
+.btn-appeler{background:#25D366;color:white;border:none;padding:12px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit}
+.badge{font-size:9px;font-weight:800;padding:3px 9px;border-radius:10px}
+.badge-route{background:#e3f2fd;color:#1565C0}
+.badge-new{background:#fff9e6;color:#cc9900}
+.empty{text-align:center;padding:40px;color:#888}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🚚 ${l.nom}</h1>
+  <p>${m?.nom_boutique} · ${orders.length} livraison(s) en cours</p>
+</div>
+<div class="stats">
+  <div class="stat"><div class="stat-val">${orders.length}</div><div class="stat-lbl">📦 À livrer</div></div>
+  <div class="stat"><div class="stat-val">${l.zone || 'Dakar'}</div><div class="stat-lbl">📍 Zone</div></div>
+</div>
+${orders.length === 0 ? '<div class="empty">✅ Toutes les livraisons sont faites !<br><br>Bonne journée 💪🇸🇳</div>' :
+  orders.map(o => {
+    const items = Array.isArray(o.items) ? o.items : (typeof o.items === 'string' ? JSON.parse(o.items) : []);
+    const produits = items.map(i => `${i.quantite}x ${i.nom}`).join(', ');
+    return `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-ref">${o.reference || '#'+o.id}</span>
+        <span class="badge ${o.status === 'en route' ? 'badge-route' : 'badge-new'}">${o.status === 'en route' ? '🚚 En route' : '🕐 Nouveau'}</span>
+      </div>
+      <div class="card-body">
+        <div class="adresse">📍 ${o.delivery_address || 'Adresse non précisée'}</div>
+        <div class="produits">📦 ${produits || 'Voir commande'}</div>
+        <div class="total">💰 ${Number(o.total).toLocaleString('fr-FR')} FCFA</div>
+        <div class="btns">
+          <button class="btn-livrer" onclick="marquerLivre(${o.id}, this)">✅ Livré</button>
+          <button class="btn-appeler" onclick="appeler('${o.customer_phone}')">📲 Appeler</button>
+        </div>
+      </div>
+    </div>`; }).join('')}
+<script>
+async function marquerLivre(id, btn) {
+  btn.disabled = true;
+  btn.textContent = '⏳...';
+  const r = await fetch('/api/livreur/livrer/'+id, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({livreur_id:${l.id}})});
+  const d = await r.json();
+  if (d.ok) { btn.closest('.card').style.opacity='0.4'; btn.textContent='✅ Livré !'; }
+  else { btn.disabled=false; btn.textContent='✅ Livré'; }
+}
+function appeler(phone) { window.location.href='tel:+'+phone; }
+</script>
+</body>
+</html>`);
+  } catch(e) { res.status(500).send('Erreur: ' + e.message); }
+});
+
+// ============================================
+// PAIEMENT ÉCHELONNÉ
+// ============================================
+
+// Créer paiement échelonné (50/50)
+app.post('/api/paiement-echelonne', async (req, res) => {
+  try {
+    const { order_id, merchant_id, client_phone, pourcentage_acompte } = req.body;
+    const pct = pourcentage_acompte || 50;
+    const orderRes = await pool.query('SELECT * FROM orders WHERE id=$1', [order_id]);
+    const order = orderRes.rows[0];
+    if (!order) return res.status(404).json({ error: 'Commande introuvable' });
+    const acompte = Math.round(order.total * pct / 100);
+    const reste = order.total - acompte;
+    const dateLimite = new Date();
+    dateLimite.setDate(dateLimite.getDate() + 7); // 7 jours pour payer le reste
+    const r = await pool.query(
+      'INSERT INTO paiements_echelonnes (order_id, merchant_id, client_phone, montant_total, acompte, reste, date_limite) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING RETURNING *',
+      [order_id, merchant_id, client_phone || order.customer_phone, order.total, acompte, reste, dateLimite]
+    );
+    // Notifier client
+    const merchantRes = await pool.query('SELECT * FROM merchants WHERE id=$1', [merchant_id]);
+    const m = merchantRes.rows[0];
+    const msg = `💳 *Paiement échelonné — ${m?.nom_boutique}*\n\n` +
+      `Commande : *${order.reference || '#'+order.id}*\n` +
+      `Montant total : *${Number(order.total).toLocaleString('fr-FR')} FCFA*\n\n` +
+      `━━━━━━━━━━━━\n` +
+      `✅ Acompte à payer maintenant : *${Number(acompte).toLocaleString('fr-FR')} FCFA*\n` +
+      `⏳ Reste à la livraison : *${Number(reste).toLocaleString('fr-FR')} FCFA*\n` +
+      `📅 Date limite : ${dateLimite.toLocaleDateString('fr-FR')}\n` +
+      `━━━━━━━━━━━━\n\n` +
+      `Payez l'acompte via Orange Money ou Wave pour confirmer votre commande 🙏\n\n_${m?.nom_boutique} · MarchandPro 🇸🇳_`;
+    await envoyerWhatsApp(process.env.PHONE_NUMBER_ID, client_phone || order.customer_phone, msg);
+    res.json({ ok: true, acompte, reste, date_limite: dateLimite, paiement: r.rows[0] });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Confirmer paiement du reste
+app.post('/api/paiement-echelonne/:order_id/solder', async (req, res) => {
+  try {
+    const r = await pool.query(
+      "UPDATE paiements_echelonnes SET statut='soldé', reste=0 WHERE order_id=$1 RETURNING *",
+      [req.params.order_id]
+    );
+    const pe = r.rows[0];
+    if (!pe) return res.status(404).json({ error: 'Paiement introuvable' });
+    // Notifier client
+    const orderRes = await pool.query('SELECT * FROM orders WHERE id=$1', [req.params.order_id]);
+    const o = orderRes.rows[0];
+    const merchantRes = await pool.query('SELECT * FROM merchants WHERE id=$1', [pe.merchant_id]);
+    const m = merchantRes.rows[0];
+    const msg = `✅ *Paiement soldé — ${m?.nom_boutique}*\n\nBravo ! Votre commande *${o?.reference || '#'+o?.id}* est entièrement payée.\n\nMontant total : *${Number(pe.montant_total).toLocaleString('fr-FR')} FCFA*\n\nMerci pour votre confiance 🙏🇸🇳`;
+    await envoyerWhatsApp(process.env.PHONE_NUMBER_ID, pe.client_phone, msg);
+    res.json({ ok: true, message: 'Paiement soldé !' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Lister paiements échelonnés d'un merchant
+app.get('/api/paiements-echelonnes/:merchant_id', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT pe.*, o.reference, o.total FROM paiements_echelonnes pe 
+       LEFT JOIN orders o ON o.id=pe.order_id 
+       WHERE pe.merchant_id=$1 ORDER BY pe.created_at DESC`,
+      [req.params.merchant_id]
+    );
+    res.json(r.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Relance automatique paiements en retard
+async function relancerPaiementsEnRetard() {
+  try {
+    const retards = await pool.query(
+      `SELECT pe.*, m.nom_boutique, m.whatsapp FROM paiements_echelonnes pe
+       LEFT JOIN merchants m ON m.id=pe.merchant_id
+       WHERE pe.statut='acompte_paye' AND pe.date_limite < NOW() AND pe.reste > 0`
+    );
+    for (const pe of retards.rows) {
+      const msg = `⚠️ *Rappel paiement — ${pe.nom_boutique}*\n\nVotre solde de *${Number(pe.reste).toLocaleString('fr-FR')} FCFA* est en retard.\n\nMerci de régler dès aujourd'hui 🙏\n\n_${pe.nom_boutique} · MarchandPro 🇸🇳_`;
+      await envoyerWhatsApp(process.env.PHONE_NUMBER_ID, pe.client_phone, msg);
+    }
+    console.log(`💳 ${retards.rows.length} relance(s) paiement échelonné`);
+  } catch(e) { console.error('Erreur relance échelonné:', e.message); }
+}
+
 // Reset PIN merchant (admin uniquement)
 app.post('/api/admin/reset-pin', adminMiddleware, async (req, res) => {
   try {
@@ -3364,5 +3634,7 @@ initDB().then(() => {
     planifierRelancesCredit();
     planifierAlerteStock();
     planifierRelanceCredits();
+    // Vérifier paiements échelonnés en retard chaque jour à 9h
+    setInterval(relancerPaiementsEnRetard, 24 * 60 * 60 * 1000);
   });
 }).catch(err => console.error('Erreur démarrage:', err));
