@@ -2940,6 +2940,15 @@ app.post('/api/merchant/login', async (req, res) => {
 });
 
 // Définir/changer PIN merchant
+// Reset PIN merchant (admin uniquement)
+app.post('/api/admin/reset-pin', adminMiddleware, async (req, res) => {
+  try {
+    const { merchant_id, nouveau_pin } = req.body;
+    await pool.query('UPDATE merchants SET pin=$1 WHERE id=$2', [nouveau_pin, merchant_id]);
+    res.json({ ok: true, message: `PIN du merchant #${merchant_id} réinitialisé` });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/merchant/set-pin', async (req, res) => {
   try {
     const { merchant_id, pin_actuel, nouveau_pin } = req.body;
