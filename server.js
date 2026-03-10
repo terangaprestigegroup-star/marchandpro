@@ -1739,9 +1739,16 @@ app.get('/boutique/:slug', async (req, res) => {
     textile:'👗', cosmetiques:'💄',
     cereales:'🌿', viande:'🥩', emballage:'📦'
   };
+  const SECTEUR_LABELS = {
+    alimentaire:'Alimentaire', menagers:'Ménagers', poisson:'Poisson & Marée',
+    pharmacie:'Pharmacie', quincaillerie:'Quincaillerie', telephonie:'Téléphonie',
+    textile:'Textile', cosmetiques:'Cosmétiques',
+    cereales:'Céréales', viande:'Viande & Volaille', emballage:'Emballage'
+  };
 
   const couleur = SECTEUR_COLORS[m.secteur] || '#006633';
   const emoji = SECTEUR_EMOJIS[m.secteur] || '🛒';
+  const secteurLabel = SECTEUR_LABELS[m.secteur] || m.secteur || 'Général';
 
   res.send(`<!DOCTYPE html>
 <html lang="fr">
@@ -1818,7 +1825,7 @@ body{font-family:'DM Sans',sans-serif;background:#f5f7f5;color:#1a2e1a;min-heigh
     <div class="boutique-nom">${m.nom_boutique}</div>
     <div class="boutique-meta">
       <span class="meta-badge">📍 ${m.ville}</span>
-      <span class="meta-badge">${emoji} ${m.secteur || 'Alimentaire'}</span>
+      <span class="meta-badge">${emoji} ${secteurLabel}</span>
       <span class="meta-badge">✅ Ouvert</span>
       ${noteMoyenne ? `<span class="meta-badge">⭐ ${noteMoyenne}/5 (${avisListe.length} avis)</span>` : ''}
     </div>
@@ -1854,7 +1861,7 @@ body{font-family:'DM Sans',sans-serif;background:#f5f7f5;color:#1a2e1a;min-heigh
     </div>
     <div class="info-row">
       <div class="info-icon">📦</div>
-      <div><div class="info-label">Secteur</div><div class="info-val">${emoji} ${m.secteur || 'Alimentaire'}</div></div>
+      <div><div class="info-label">Secteur</div><div class="info-val">${emoji} ${secteurLabel}</div></div>
     </div>
     <div class="info-row">
       <div class="info-icon">⭐</div>
@@ -2009,7 +2016,7 @@ input:focus, select:focus { border-color:#006633; }
     <button class="secteur-btn" onclick="selSecteur('pharmacie',this)"><span class="secteur-emoji">💊</span>Pharmacie</button>
     <button class="secteur-btn" onclick="selSecteur('quincaillerie',this)"><span class="secteur-emoji">🔧</span>Quincaillerie</button>
     <button class="secteur-btn" onclick="selSecteur('telephonie',this)"><span class="secteur-emoji">📱</span>Téléphonie</button>
-    <button class="secteur-btn" onclick="selSecteur('textile',this)" style="grid-column:1/-1"><span class="secteur-emoji">👗</span>Textile & Friperie</button>
+    <button class="secteur-btn" onclick="selSecteur('textile',this)" style="grid-column:1/-1"><span class="secteur-emoji">👗</span>Textile</button>
   </div>
   <input type="hidden" id="secteur" value="alimentaire" />
   <label>Nom de votre boutique *</label>
