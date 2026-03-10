@@ -2667,7 +2667,26 @@ function planifierRelances() {
 // ============================================
 // CARTE DES GROSSISTES
 // ============================================
-// API livreur — marquer commande livrée
+// Route admin — corriger noms produits merchant #1
+app.get('/api/admin/fix-produits', async (req, res) => {
+  try {
+    await pool.query(`
+      UPDATE merchants SET catalogue = '[
+        {"nom":"Riz brisé","unite":"sac 50kg","prix":22000,"mots":["riz"]},
+        {"nom":"Huile végétale","unite":"bidon 20L","prix":25000,"mots":["huile"]},
+        {"nom":"Sucre","unite":"sac 50kg","prix":30000,"mots":["sucre"]},
+        {"nom":"Farine","unite":"sac 50kg","prix":20000,"mots":["farine"]},
+        {"nom":"Mil","unite":"sac 50kg","prix":18000,"mots":["mil"]},
+        {"nom":"Tomate concentrée","unite":"carton","prix":15000,"mots":["tomate"]},
+        {"nom":"Savon","unite":"carton","prix":12000,"mots":["savon"]},
+        {"nom":"Lait en poudre","unite":"boite 2.5kg","prix":8500,"mots":["lait"]}
+      ]'::jsonb WHERE id = 1
+    `);
+    res.json({ ok: true, message: 'Produits corrigés !' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+
 app.post('/api/livreur/livrer/:id', async (req, res) => {
   try {
     const { id } = req.params;
