@@ -142,6 +142,11 @@ async function initDB() {
     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS mois_offerts INTEGER DEFAULT 0;
     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS secteur VARCHAR(50) DEFAULT 'alimentaire';
     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS pin VARCHAR(10) DEFAULT NULL;
+    -- CRÉDIT CLIENT
+    CREATE TABLE IF NOT EXISTS credits (id SERIAL PRIMARY KEY, merchant_id INTEGER NOT NULL, client_phone VARCHAR(50) NOT NULL, client_name VARCHAR(100), montant DECIMAL DEFAULT 0, notes TEXT, created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW());
+    CREATE TABLE IF NOT EXISTS credits_historique (id SERIAL PRIMARY KEY, credit_id INTEGER, merchant_id INTEGER, client_phone VARCHAR(50), type VARCHAR(20), montant DECIMAL, notes TEXT, created_at TIMESTAMP DEFAULT NOW());
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS prix_achat DECIMAL DEFAULT 0;
+    CREATE TABLE IF NOT EXISTS certificats (id SERIAL PRIMARY KEY, merchant_id INTEGER UNIQUE NOT NULL, numero VARCHAR(20) UNIQUE NOT NULL, date_emission TIMESTAMP DEFAULT NOW(), actif BOOLEAN DEFAULT true);
     INSERT INTO merchants (id, nom_boutique, proprietaire, whatsapp, ville, plan, catalogue)
     VALUES (1, 'MarchandPro Demo', 'Terangaprestige', '221711288439', 'Dakar', 'pro',
       '[{"nom":"Riz brisé","unite":"sac 50kg","prix":22000,"mots":["riz"]},{"nom":"Huile végétale","unite":"bidon 20L","prix":25000,"mots":["huile"]},{"nom":"Sucre","unite":"sac 50kg","prix":30000,"mots":["sucre"]},{"nom":"Farine","unite":"sac 50kg","prix":20000,"mots":["farine"]},{"nom":"Mil","unite":"sac 50kg","prix":18000,"mots":["mil"]},{"nom":"Tomate concentrée","unite":"carton","prix":15000,"mots":["tomate"]},{"nom":"Savon","unite":"carton","prix":12000,"mots":["savon"]},{"nom":"Lait en poudre","unite":"boite 2.5kg","prix":8500,"mots":["lait"]}]'::jsonb)
@@ -838,6 +843,54 @@ app.post('/webhook/whatsapp', async (req, res) => {
         // Groq AI + Parser commande
         else {
 
+
+          // ============================================
+          // CRÉDIT CLIENT — "crédit Amadou" ou "solde crédit"
+          // ============================================
+          if (/cr[eé]dit|solde|doit|dette/i.test(texte)) {
+            // Extraire le nom du client depuis le message
+            const nomMatch = texte.replace(/cr[eé]dit|solde|doit|dette/gi, '').trim();
+            if (nomMatch.length > 1) {
+              // Chercher ce client dans les crédits
+              const credits = await pool.query(
+                `SELECT * FROM credits WHERE merchant_id=$1 AND (LOWER(client_name) LIKE $2 OR client_phone LIKE $3)`,
+                [merchant.id, `%${nomMatch.toLowerCase()}%`, `%${nomMatch}%`]
+              );
+              if (credits.rows.length > 0) {
+                const c = credits.rows[0];
+                const solde = Number(c.montant).toLocaleString('fr-FR');
+                await envoyerWhatsApp(phone_id, phone,
+                  `💰 *Crédit de ${c.client_name}*\n\n` +
+                  `Solde actuel : *${solde} FCFA*\n` +
+                  `Dernière mise à jour : ${new Date(c.updated_at).toLocaleDateString('fr-FR')}\n\n` +
+                  `_Pour ajouter un crédit, utilisez le dashboard_`
+                );
+              } else {
+                await envoyerWhatsApp(phone_id, phone,
+                  `💰 *Crédit — ${nomMatch}*\n\nAucun crédit trouvé pour ce client.\n\n_Utilisez le dashboard pour ajouter un crédit_`
+                );
+              }
+            } else {
+              // Afficher tous les crédits
+              const credits = await pool.query(
+                'SELECT * FROM credits WHERE merchant_id=$1 AND montant > 0 ORDER BY montant DESC LIMIT 10',
+                [merchant.id]
+              );
+              if (credits.rows.length === 0) {
+                await envoyerWhatsApp(phone_id, phone, `💰 *Crédits clients*\n\nAucun crédit en cours ✅`);
+              } else {
+                const total = credits.rows.reduce((s, c) => s + Number(c.montant), 0);
+                let msg = `💰 *Crédits clients — ${merchant.nom_boutique}*\n\n`;
+                credits.rows.forEach(c => {
+                  msg += `• ${c.client_name} : *${Number(c.montant).toLocaleString('fr-FR')} FCFA*\n`;
+                });
+                msg += `\n━━━━━━━━━━\n💵 Total : *${total.toLocaleString('fr-FR')} FCFA*`;
+                await envoyerWhatsApp(phone_id, phone, msg);
+              }
+            }
+            return res.sendStatus(200);
+          }
+
           // ============================================
           // AVIS CLIENT — après livraison
           // ============================================
@@ -1048,12 +1101,12 @@ app.post('/webhook/whatsapp', async (req, res) => {
                       name: 'MarchandPro',
                       tagline: 'Votre grossiste digital 🇸🇳',
                       phone: '+221711288439',
-                      website_url: 'https://marchandpro-production-b529.up.railway.app'
+                      website_url: 'https://marchandpro.up.railway.app'
                     },
                     actions: {
-                      cancel_url: 'https://marchandpro-production-b529.up.railway.app',
-                      return_url: 'https://marchandpro-production-b529.up.railway.app',
-                      callback_url: 'https://marchandpro-production-b529.up.railway.app/api/paydunya/webhook'
+                      cancel_url: 'https://marchandpro.up.railway.app',
+                      return_url: 'https://marchandpro.up.railway.app',
+                      callback_url: 'https://marchandpro.up.railway.app/api/paydunya/webhook'
                     }
                   })
                 });
@@ -1262,12 +1315,12 @@ async function genererLienPaiement(ref, total, phone) {
           name: 'MarchandPro',
           tagline: 'Votre grossiste digital 🇸🇳',
           phone: '+221711288439',
-          website_url: 'https://marchandpro-production-b529.up.railway.app'
+          website_url: 'https://marchandpro.up.railway.app'
         },
         actions: {
-          cancel_url: 'https://marchandpro-production-b529.up.railway.app',
-          return_url: 'https://marchandpro-production-b529.up.railway.app',
-          callback_url: 'https://marchandpro-production-b529.up.railway.app/api/paydunya/webhook'
+          cancel_url: 'https://marchandpro.up.railway.app',
+          return_url: 'https://marchandpro.up.railway.app',
+          callback_url: 'https://marchandpro.up.railway.app/api/paydunya/webhook'
         },
         custom_data: { ref, phone }
       })
@@ -1504,7 +1557,7 @@ app.post('/api/merchants/register', async (req, res) => {
     );
 
     const merchant = result.rows[0];
-    const BASE = 'https://marchandpro-production-b529.up.railway.app';
+    const BASE = 'https://marchandpro.up.railway.app';
     console.log(`✅ Nouveau grossiste: ${nom_boutique} (${wa}) — Code parrainage: ${referralCode}`);
 
     // Message bienvenue avec lien parrainage
@@ -1572,7 +1625,7 @@ app.get('/api/merchants/:id/parrainage', async (req, res) => {
     res.json({
       ok: true,
       referral_code: m.referral_code,
-      lien: `https://marchandpro-production-b529.up.railway.app/inscription?ref=${m.referral_code}`,
+      lien: `https://marchandpro.up.railway.app/inscription?ref=${m.referral_code}`,
       mois_offerts: m.mois_offerts || 0,
       filleuls: filleuls.rows
     });
@@ -1625,7 +1678,7 @@ app.get('/merchant/:id', async (req, res) => {
   const merchant = await pool.query('SELECT * FROM merchants WHERE id=$1', [id]).catch(() => null);
   if (!merchant?.rows[0]) return res.status(404).send('Grossiste introuvable');
   const m = merchant.rows[0];
-  const BASE = 'https://marchandpro-production-b529.up.railway.app';
+  const BASE = 'https://marchandpro.up.railway.app';
   const lienParrainage = m.referral_code ? `${BASE}/inscription?ref=${m.referral_code}` : null;
   res.send(`
 <!DOCTYPE html>
@@ -1698,7 +1751,7 @@ td { padding:10px 8px;border-bottom:1px solid #f5f5f5; }
 </div>
 <div class="footer">MarchandPro 🇸🇳 — <a href="/" style="color:#006633">Accueil</a></div>
 <script>
-const API = 'https://marchandpro-production-b529.up.railway.app';
+const API = 'https://marchandpro.up.railway.app';
 const LIEN_PARRAINAGE = '${lienParrainage || ""}';
 
 function copierLien() {
@@ -1772,7 +1825,7 @@ app.get('/boutique/:slug', async (req, res) => {
 
   const m = result.rows[0];
   const catalogue = Array.isArray(m.catalogue) ? m.catalogue : JSON.parse(m.catalogue || '[]');
-  const BASE = 'https://marchandpro-production-b529.up.railway.app';
+  const BASE = 'https://marchandpro.up.railway.app';
   const WA = `https://wa.me/221711288439?text=${encodeURIComponent(`Bonjour ${m.nom_boutique} ! Je veux commander.`)}`;
 
   // Récupérer les avis clients
@@ -2607,7 +2660,7 @@ app.get('/api/bilan/:merchant_id', async (req, res) => {
 
 <div class="footer">
   <p>🛒 MarchandPro · La solution digitale pour les grossistes sénégalais 🇸🇳</p>
-  <p style="margin-top:4px">marchandpro-production-b529.up.railway.app · +221 71 128 84 39</p>
+  <p style="margin-top:4px">marchandpro.up.railway.app · +221 71 128 84 39</p>
 </div>
 
 <div style="text-align:center;margin-top:24px">
@@ -2644,7 +2697,7 @@ app.post('/api/promo', authMiddleware, async (req, res) => {
     if (clients.length === 0) return res.json({ ok: true, envoyes: 0, message: 'Aucun client à contacter' });
 
     const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
-    const catalogueUrl = `https://marchandpro-production-b529.up.railway.app/catalogue/${merchant_id}`;
+    const catalogueUrl = `https://marchandpro.up.railway.app/catalogue/${merchant_id}`;
 
     // Construire le message promo
     const remiseText = remise ? `\n🎁 *Remise spéciale : -${remise}%* aujourd'hui seulement !` : '';
@@ -2830,7 +2883,7 @@ async function envoyerRapportHebdo() {
         const dateDebut = lundiDernier.toLocaleDateString('fr-FR', {day:'numeric', month:'long'});
         const dateFin = maintenant.toLocaleDateString('fr-FR', {day:'numeric', month:'long'});
 
-        const message = `📊 *Bilan semaine — ${m.nom_boutique}*\n🗓️ Du ${dateDebut} au ${dateFin}\n\n━━━━━━━━━━━━━━━\n📋 Commandes : *${totalCmds}*\n💰 Revenus : *${revenus.toLocaleString('fr-FR')} FCFA*\n👥 Clients actifs : *${clients}*\n${starText}\n━━━━━━━━━━━━━━━\n${tendance}\n\n🔗 Dashboard :\nhttps://marchandpro-production-b529.up.railway.app/app\n\nBonne semaine ! 💪🇸🇳\n— *MarchandPro*`;
+        const message = `📊 *Bilan semaine — ${m.nom_boutique}*\n🗓️ Du ${dateDebut} au ${dateFin}\n\n━━━━━━━━━━━━━━━\n📋 Commandes : *${totalCmds}*\n💰 Revenus : *${revenus.toLocaleString('fr-FR')} FCFA*\n👥 Clients actifs : *${clients}*\n${starText}\n━━━━━━━━━━━━━━━\n${tendance}\n\n🔗 Dashboard :\nhttps://marchandpro.up.railway.app/app\n\nBonne semaine ! 💪🇸🇳\n— *MarchandPro*`;
 
         await envoyerWhatsApp(PHONE_NUMBER_ID, phone, message);
         console.log(`✅ Rapport hebdo envoyé à ${m.nom_boutique}`);
@@ -2906,10 +2959,291 @@ app.post('/api/merchant/set-pin', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+
+// ============================================
+// 1. CRÉDIT CLIENT
+// ============================================
+
+// Lister crédits d'un merchant
+app.get('/api/credits/:merchant_id', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM credits WHERE merchant_id=$1 ORDER BY montant DESC',
+      [req.params.merchant_id]
+    );
+    res.json(result.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Ajouter ou mettre à jour crédit d'un client
+app.post('/api/credits', async (req, res) => {
+  try {
+    const { merchant_id, client_phone, client_name, montant, notes, type } = req.body;
+    // Chercher crédit existant
+    const existing = await pool.query(
+      'SELECT * FROM credits WHERE merchant_id=$1 AND client_phone=$2',
+      [merchant_id, client_phone]
+    );
+    let credit;
+    if (existing.rows[0]) {
+      const newMontant = type === 'remboursement'
+        ? existing.rows[0].montant - montant
+        : existing.rows[0].montant + montant;
+      const r = await pool.query(
+        'UPDATE credits SET montant=$1, updated_at=NOW(), client_name=COALESCE($2, client_name) WHERE merchant_id=$3 AND client_phone=$4 RETURNING *',
+        [Math.max(0, newMontant), client_name, merchant_id, client_phone]
+      );
+      credit = r.rows[0];
+    } else {
+      const r = await pool.query(
+        'INSERT INTO credits (merchant_id, client_phone, client_name, montant, notes) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+        [merchant_id, client_phone, client_name || client_phone, montant, notes]
+      );
+      credit = r.rows[0];
+    }
+    // Historique
+    await pool.query(
+      'INSERT INTO credits_historique (credit_id, merchant_id, client_phone, type, montant, notes) VALUES ($1,$2,$3,$4,$5,$6)',
+      [credit.id, merchant_id, client_phone, type || 'ajout', montant, notes]
+    );
+    res.json({ ok: true, credit });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Solde crédit d'un client
+app.get('/api/credits/:merchant_id/client/:phone', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM credits WHERE merchant_id=$1 AND client_phone=$2',
+      [req.params.merchant_id, req.params.phone]
+    );
+    res.json(result.rows[0] || { montant: 0 });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Relance crédits vendredi (manuelle ou auto)
+app.get('/api/credits/:merchant_id/relances', async (req, res) => {
+  try {
+    const merchant = await pool.query('SELECT * FROM merchants WHERE id=$1', [req.params.merchant_id]);
+    const m = merchant.rows[0];
+    if (!m) return res.status(404).json({ error: 'Merchant introuvable' });
+    const credits = await pool.query(
+      'SELECT * FROM credits WHERE merchant_id=$1 AND montant > 0',
+      [req.params.merchant_id]
+    );
+    let envoyés = 0;
+    for (const c of credits.rows) {
+      const msg = `💰 Rappel de paiement — ${m.nom_boutique}\n\nBonjour ${c.client_name || ''},\n\nVous avez un crédit en cours de *${Number(c.montant).toLocaleString('fr-FR')} FCFA*.\n\nMerci de régulariser dès que possible 🙏\n\n_${m.nom_boutique} · MarchandPro_`;
+      await envoyerWhatsApp(process.env.PHONE_NUMBER_ID, c.client_phone, msg);
+      envoyés++;
+    }
+    res.json({ ok: true, envoyés, message: `${envoyés} relance(s) crédit envoyée(s)` });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================
+// 2. COMPARATEUR MARGES
+// ============================================
+
+// Mettre à jour prix d'achat d'un produit
+app.put('/api/products/:merchant_id/:produit_nom/marge', async (req, res) => {
+  try {
+    const { prix_achat } = req.body;
+    const merchant = await pool.query('SELECT catalogue FROM merchants WHERE id=$1', [req.params.merchant_id]);
+    const catalogue = merchant.rows[0]?.catalogue || [];
+    const updated = catalogue.map(p => {
+      if (p.nom === req.params.produit_nom) return { ...p, prix_achat: parseFloat(prix_achat) };
+      return p;
+    });
+    await pool.query('UPDATE merchants SET catalogue=$1 WHERE id=$2', [JSON.stringify(updated), req.params.merchant_id]);
+    res.json({ ok: true, message: 'Prix d\'achat mis à jour' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Calculer marges de tous les produits
+app.get('/api/marges/:merchant_id', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT catalogue FROM merchants WHERE id=$1', [req.params.merchant_id]);
+    const catalogue = result.rows[0]?.catalogue || [];
+    const marges = catalogue.map(p => {
+      const prixVente = p.prix || 0;
+      const prixAchat = p.prix_achat || 0;
+      const marge = prixAchat > 0 ? ((prixVente - prixAchat) / prixAchat * 100).toFixed(1) : null;
+      const benefice = prixVente - prixAchat;
+      return {
+        nom: p.nom,
+        unite: p.unite,
+        prix_vente: prixVente,
+        prix_achat: prixAchat,
+        benefice_unitaire: benefice,
+        marge_pct: marge,
+        alerte: marge !== null && parseFloat(marge) < 10
+      };
+    });
+    // Trier par marge décroissante
+    marges.sort((a, b) => (parseFloat(b.marge_pct) || 0) - (parseFloat(a.marge_pct) || 0));
+    res.json(marges);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============================================
+// 3. CERTIFICAT GROSSISTE
+// ============================================
+
+// Générer certificat pour un merchant
+app.post('/api/certificat/:merchant_id', async (req, res) => {
+  try {
+    const merchant = await pool.query('SELECT * FROM merchants WHERE id=$1', [req.params.merchant_id]);
+    const m = merchant.rows[0];
+    if (!m) return res.status(404).json({ error: 'Merchant introuvable' });
+    // Générer numéro unique
+    const numero = `MP-SN-${new Date().getFullYear()}-${String(m.id).padStart(4, '0')}`;
+    await pool.query(
+      'INSERT INTO certificats (merchant_id, numero) VALUES ($1,$2) ON CONFLICT (merchant_id) DO UPDATE SET actif=true, date_emission=NOW()',
+      [m.id, numero]
+    );
+    res.json({ ok: true, numero, merchant: m.nom_boutique });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Afficher certificat HTML imprimable
+app.get('/api/certificat/:merchant_id/view', async (req, res) => {
+  try {
+    const r = await pool.query(
+      'SELECT m.*, c.numero, c.date_emission FROM merchants m LEFT JOIN certificats c ON c.merchant_id=m.id WHERE m.id=$1',
+      [req.params.merchant_id]
+    );
+    const m = r.rows[0];
+    if (!m) return res.status(404).send('Merchant introuvable');
+    const date = m.date_emission ? new Date(m.date_emission).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR');
+    const numero = m.numero || `MP-SN-${new Date().getFullYear()}-${String(m.id).padStart(4, '0')}`;
+    const getSecteurLabel = (s) => {
+      const map = { alimentaire:'Alimentaire 🌾', boissons:'Boissons 🥤', poisson:'Poisson & Marée 🐟', pharmacie:'Pharmacie 💊', quincaillerie:'Quincaillerie 🔧', telephonie:'Téléphonie 📱', textile:'Textile 👗', cosmetiques:'Cosmétiques 💄', cereales:'Céréales 🌿', viande:'Viande & Volaille 🥩', emballage:'Emballage 📦', menagers:'Ménagers 🧴', gaz:'Gaz & Énergie ⛽' };
+      return map[s] || s;
+    };
+    res.send(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Certificat MarchandPro — ${m.nom_boutique}</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: Georgia, serif; background: #f4f7f4; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; }
+.cert { background: white; width: 720px; padding: 0; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.12); }
+.cert-header { background: linear-gradient(135deg, #003d1f, #006633); padding: 40px; text-align: center; position: relative; }
+.cert-header::before { content: ''; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M20 20L0 0h40z'/%3E%3C/g%3E%3C/svg%3E"); }
+.cert-logo { font-size: 48px; margin-bottom: 8px; }
+.cert-title { font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.7); letter-spacing: 4px; text-transform: uppercase; margin-bottom: 4px; font-family: Arial, sans-serif; }
+.cert-subtitle { font-size: 28px; font-weight: 700; color: #FFD700; font-family: Georgia, serif; }
+.cert-body { padding: 40px; }
+.cert-declares { font-size: 13px; color: #888; text-align: center; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 24px; font-family: Arial, sans-serif; }
+.cert-name { font-size: 36px; font-weight: 700; color: #006633; text-align: center; margin-bottom: 8px; }
+.cert-secteur { font-size: 16px; color: #5a7a5a; text-align: center; margin-bottom: 32px; font-family: Arial, sans-serif; }
+.cert-details { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+.cert-detail { background: #f4f7f4; border-radius: 10px; padding: 14px 18px; border-left: 3px solid #006633; }
+.cert-detail-label { font-size: 10px; font-weight: 700; color: #888; letter-spacing: 2px; text-transform: uppercase; font-family: Arial, sans-serif; margin-bottom: 4px; }
+.cert-detail-value { font-size: 15px; font-weight: 700; color: #0d1f0d; font-family: Arial, sans-serif; }
+.cert-text { font-size: 13px; color: #5a7a5a; text-align: center; line-height: 1.8; margin-bottom: 32px; font-family: Arial, sans-serif; }
+.cert-numero { background: linear-gradient(135deg, #003d1f, #006633); color: white; padding: 16px; text-align: center; border-radius: 10px; margin-bottom: 32px; }
+.cert-numero-label { font-size: 10px; color: rgba(255,255,255,0.6); letter-spacing: 3px; text-transform: uppercase; font-family: Arial, sans-serif; }
+.cert-numero-value { font-size: 22px; font-weight: 700; color: #FFD700; letter-spacing: 2px; font-family: Arial, sans-serif; }
+.cert-footer { display: flex; justify-content: space-between; align-items: flex-end; padding-top: 24px; border-top: 1px solid #e0ece0; }
+.cert-sign { text-align: center; }
+.cert-sign-line { width: 120px; height: 1px; background: #006633; margin: 0 auto 6px; }
+.cert-sign-name { font-size: 12px; font-weight: 700; color: #006633; font-family: Arial, sans-serif; }
+.cert-sign-title { font-size: 10px; color: #888; font-family: Arial, sans-serif; }
+.cert-seal { width: 80px; height: 80px; border-radius: 50%; border: 3px solid #006633; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+.cert-seal-text { font-size: 8px; color: #006633; font-weight: 700; letter-spacing: 1px; font-family: Arial, sans-serif; }
+.cert-seal-icon { font-size: 24px; }
+.cert-date { font-size: 11px; color: #888; text-align: center; margin-top: 16px; font-family: Arial, sans-serif; }
+@media print { body { background: white; } }
+</style>
+</head>
+<body>
+<div class="cert">
+  <div class="cert-header">
+    <div class="cert-logo">🛒</div>
+    <div class="cert-title">MarchandPro · Terangaprestige Group</div>
+    <div class="cert-subtitle">Certificat de Grossiste Digital</div>
+  </div>
+  <div class="cert-body">
+    <div class="cert-declares">Certifie que</div>
+    <div class="cert-name">${m.nom_boutique}</div>
+    <div class="cert-secteur">${getSecteurLabel(m.secteur)} · ${m.ville}</div>
+    <div class="cert-details">
+      <div class="cert-detail"><div class="cert-detail-label">Propriétaire</div><div class="cert-detail-value">${m.proprietaire}</div></div>
+      <div class="cert-detail"><div class="cert-detail-label">Ville</div><div class="cert-detail-value">📍 ${m.ville}</div></div>
+      <div class="cert-detail"><div class="cert-detail-label">Plan</div><div class="cert-detail-value">${m.plan === 'pro' ? '👑 Pro' : m.plan === 'starter' ? '⭐ Starter' : '🆓 Gratuit'}</div></div>
+      <div class="cert-detail"><div class="cert-detail-label">Membre depuis</div><div class="cert-detail-value">${new Date(m.created_at).toLocaleDateString('fr-FR')}</div></div>
+    </div>
+    <div class="cert-text">
+      Est un grossiste certifié et vérifié sur la plateforme MarchandPro.<br>
+      Ce certificat atteste que le grossiste utilise notre solution digitale<br>
+      pour la gestion de ses commandes WhatsApp au Sénégal. 🇸🇳
+    </div>
+    <div class="cert-numero">
+      <div class="cert-numero-label">Numéro de certificat</div>
+      <div class="cert-numero-value">${numero}</div>
+    </div>
+    <div class="cert-footer">
+      <div class="cert-sign">
+        <div class="cert-sign-line"></div>
+        <div class="cert-sign-name">Terangaprestige Group</div>
+        <div class="cert-sign-title">MarchandPro · Dakar, Sénégal</div>
+      </div>
+      <div class="cert-seal">
+        <div class="cert-seal-icon">✅</div>
+        <div class="cert-seal-text">CERTIFIÉ</div>
+      </div>
+      <div class="cert-sign">
+        <div class="cert-sign-line"></div>
+        <div class="cert-sign-name">Date d'émission</div>
+        <div class="cert-sign-title">${date}</div>
+      </div>
+    </div>
+    <div class="cert-date">Vérifiable sur marchandpro.up.railway.app · Valable 1 an</div>
+  </div>
+</div>
+<script>setTimeout(() => window.print(), 800);</script>
+</body>
+</html>`);
+  } catch(e) { res.status(500).send(e.message); }
+});
+
+// Planifier relances crédit chaque vendredi 10h
+function planifierRelancesCredit() {
+  const now = new Date();
+  const vendredi = new Date(now);
+  const jour = now.getDay();
+  const joursAvantVendredi = jour <= 5 ? 5 - jour : 6;
+  vendredi.setDate(now.getDate() + (joursAvantVendredi === 0 && now.getHours() >= 10 ? 7 : joursAvantVendredi));
+  vendredi.setHours(10, 0, 0, 0);
+  const delai = vendredi - now;
+  console.log(`💰 Prochaines relances crédit dans ${Math.round(delai/1000/60/60)}h`);
+  setTimeout(async () => {
+    const merchants = await pool.query('SELECT id FROM merchants WHERE actif=true');
+    for (const m of merchants.rows) {
+      try {
+        const credits = await pool.query('SELECT * FROM credits WHERE merchant_id=$1 AND montant > 0', [m.id]);
+        const merchant = await pool.query('SELECT * FROM merchants WHERE id=$1', [m.id]);
+        const mData = merchant.rows[0];
+        for (const c of credits.rows) {
+          const msg = `💰 Rappel de paiement — ${mData.nom_boutique}\n\nBonjour ${c.client_name || ''},\n\nVous avez un crédit de *${Number(c.montant).toLocaleString('fr-FR')} FCFA* en cours.\n\nMerci de régulariser 🙏\n\n_MarchandPro_`;
+          await envoyerWhatsApp(process.env.PHONE_NUMBER_ID, c.client_phone, msg);
+        }
+      } catch(e) { console.error('Erreur relance crédit:', e.message); }
+    }
+    setInterval(async () => {
+      // Répéter chaque vendredi
+    }, 7 * 24 * 60 * 60 * 1000);
+  }, delai);
+}
+
 initDB().then(() => {
   app.listen(process.env.PORT || 3000, () => {
     console.log('🚀 MarchandPro v3.1 démarré sur port ' + (process.env.PORT || 3000));
     planifierRelances();
     planifierRapportHebdo();
+    planifierRelancesCredit();
   });
 }).catch(err => console.error('Erreur démarrage:', err));
