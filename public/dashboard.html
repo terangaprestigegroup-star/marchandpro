@@ -703,7 +703,7 @@ function hideLoginModal() {
   document.getElementById('login-overlay').style.display = 'none';
 }
 
-async function submitPin() {
+async async function submitPin() {
   const pin = document.getElementById('pin-input').value;
   const btn = document.getElementById('pin-btn');
   const err = document.getElementById('pin-error');
@@ -1177,7 +1177,7 @@ async function chargerCredits() {
   } catch(e) { console.error(e); }
 }
 
-function ouvrirModalCredit() {
+async function ouvrirModalCredit() {
   const nom = prompt('Nom du client :');
   if (!nom) return;
   const phone = prompt('Numéro WhatsApp (ex: 221701234567) :');
@@ -1268,7 +1268,7 @@ async function genererCertificat() {
   } catch(e) { alert('Erreur : ' + e.message); }
 }
 
-function voirCertificat() {
+async function voirCertificat() {
   window.open(`${API}/api/certificat/${MERCHANT_ID}/view`, '_blank');
 }
 
@@ -1403,7 +1403,7 @@ async function chargerFournisseurs() {
   } catch(e) { console.error(e); }
 }
 
-function voirTousFournisseurs() {
+async function voirTousFournisseurs() {
   window.open(`${API}/fournisseurs`, '_blank');
 }
 
