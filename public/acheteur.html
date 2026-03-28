@@ -76,6 +76,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--texte);mi
   </div>
 
   <div class="content">
+    <div id="cat-filter" style="display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin-bottom:14px;padding-bottom:2px"></div>
     <div class="section-title">🛒 Nos produits</div>
     <div id="liste-produits">
       <div style="text-align:center;padding:40px;color:var(--texte3)">⏳ Chargement...</div>
@@ -155,15 +156,38 @@ async function init(){
     document.getElementById('header-sub').textContent = marchand.description || 'Passez votre commande';
     document.title = marchand.nom_boutique + ' — Commander';
     
+    renderCatFilter();
     renderProduits();
   }catch(e){
     document.getElementById('liste-produits').innerHTML='<div style="text-align:center;padding:40px;color:var(--rouge)">❌ Erreur de chargement</div>';
   }
 }
 
+let catActive = 'tous';
+
+function renderCatFilter(){
+  const cats = [...new Set(produits.filter(p=>p.disponible).map(p=>p.categorie))];
+  const el = document.getElementById('cat-filter');
+  if(cats.length < 2){ el.style.display='none'; return; }
+  const labels = {
+    alimentation:'🌾 Alimentation', frais:'🐟 Frais', quincaillerie:'🔧 Quincaillerie',
+    hygiene:'🧼 Hygiène', bebe:'👶 Bébé', textile:'👗 Textile',
+    electronique:'📱 Électronique', 'import-export':'🌍 Import-Export', general:'📦 Général'
+  };
+  el.innerHTML = `<button onclick="filtrerCat('tous',this)" style="padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--b);color:#fff;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;touch-action:manipulation" id="cat-tous">Tous</button>` +
+    cats.map(c=>`<button onclick="filtrerCat('${c}',this)" style="padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--bg2);color:var(--texte3);font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;touch-action:manipulation">${labels[c]||c}</button>`).join('');
+}
+
+function filtrerCat(cat, btn){
+  catActive = cat;
+  document.querySelectorAll('#cat-filter button').forEach(b=>{ b.style.background='var(--bg2)'; b.style.color='var(--texte3)'; });
+  btn.style.background='var(--b)'; btn.style.color='#fff';
+  renderProduits();
+}
+
 function renderProduits(){
   const el = document.getElementById('liste-produits');
-  const dispos = produits.filter(p=>p.disponible);
+  const dispos = produits.filter(p=>p.disponible && (catActive==='tous'||p.categorie===catActive));
   if(!dispos.length){
     el.innerHTML='<div style="text-align:center;padding:40px;color:var(--texte3)"><div style="font-size:40px;margin-bottom:12px">🛒</div><div style="font-size:14px;font-weight:700">Aucun produit disponible</div></div>';
     return;
