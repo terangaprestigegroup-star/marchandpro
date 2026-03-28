@@ -2,1466 +2,696 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MarchandPro Dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>MarchandPro — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --vert: #006633;
-    --vert-fonce: #004d26;
-    --vert-clair: #e8f5e9;
-    --or: #FFD700;
-    --or-fonce: #e6c200;
-    --rouge: #c0392b;
-    --blanc: #ffffff;
-    --gris-bg: #f0f4f0;
-    --gris-card: #ffffff;
-    --texte: #1a2e1a;
-    --texte-light: #5a7a5a;
-    --shadow: 0 4px 24px rgba(0,102,51,0.10);
-    --radius: 16px;
-  }
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --b:#1B4332;--b2:#2D6A4F;--or:#D4A017;--or2:#F0C040;
+  --bg:#F0F7F4;--bg2:#E0EFE8;--card:#FFFFFF;
+  --texte:#0D1F16;--texte2:#2D5A3D;--texte3:#6B8F7A;
+  --border:#C8DDD2;--rouge:#C0392B;--vert:#1B4332;
+  --card-shadow:0 2px 12px rgba(27,67,50,0.08);
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--texte);min-height:100vh;overflow-x:hidden}
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+/* LOGIN */
+#login-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(160deg,#0D1F16,#1B4332);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-box{background:#fff;border-radius:24px;padding:32px 24px;width:100%;max-width:300px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.login-logo{font-size:48px;margin-bottom:8px}
+.login-title{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--texte);margin-bottom:4px}
+.login-sub{font-size:12px;color:var(--texte3);margin-bottom:24px}
+.login-input{width:100%;padding:14px;border:2px solid var(--border);border-radius:12px;font-size:28px;text-align:center;letter-spacing:8px;margin-bottom:14px;outline:none;background:#F8FBF9;color:var(--texte);font-family:'DM Sans',sans-serif;-moz-appearance:textfield}
+.login-input:focus{border-color:var(--b)}
+.login-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--b),var(--b2));color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;position:relative;z-index:10;touch-action:manipulation}
+.login-hint{font-size:11px;color:var(--texte3);margin-top:10px}
+.login-error{color:var(--rouge);font-size:12px;font-weight:700;margin-top:8px;min-height:18px}
+.login-forgot{background:none;border:none;color:var(--texte3);font-size:11px;cursor:pointer;margin-top:8px;text-decoration:underline}
 
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--gris-bg);
-    color: var(--texte);
-    min-height: 100vh;
-  }
+/* NAV */
+.nav{background:var(--card);border-bottom:1px solid var(--border);height:52px;display:flex;align-items:center;padding:0 16px;position:sticky;top:0;z-index:100;box-shadow:var(--card-shadow)}
+.nav-logo{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--b);flex:1}
+.nav-badge{background:rgba(27,67,50,.08);color:var(--b);padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700}
 
-  /* SIDEBAR */
-  .sidebar {
-    position: fixed;
-    left: 0; top: 0; bottom: 0;
-    width: 240px;
-    background: var(--vert-fonce);
-    display: flex;
-    flex-direction: column;
-    padding: 24px 16px;
-    z-index: 100;
-  }
+/* BOTTOM NAV */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)}
+.bnav-tab{flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 4px;border:none;background:none;cursor:pointer;color:var(--texte3);font-size:9px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;touch-action:manipulation;transition:.2s}
+.bnav-tab span{font-size:22px;margin-bottom:2px}
+.bnav-tab.active{color:var(--b)}
+.bnav-tab.active span{filter:drop-shadow(0 2px 4px rgba(27,67,50,.2))}
 
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 12px 24px;
-    border-bottom: 1px solid rgba(255,215,0,0.2);
-    margin-bottom: 24px;
-  }
+/* CONTENT */
+.page{display:none;padding:14px 14px 80px}
+.page.active{display:block}
 
-  .logo-icon {
-    width: 40px; height: 40px;
-    background: var(--or);
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 20px;
-  }
+/* KPIs */
+.kpi-hero{background:linear-gradient(135deg,var(--b),var(--b2));border-radius:20px;padding:20px;margin-bottom:14px;color:#fff;position:relative;overflow:hidden}
+.kpi-hero::before{content:'💰';position:absolute;right:-10px;bottom:-10px;font-size:80px;opacity:.08}
+.kpi-hero-label{font-size:11px;font-weight:600;opacity:.7;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.kpi-hero-val{font-family:'Playfair Display',serif;font-size:36px;font-weight:800;color:#fff;letter-spacing:-1px}
+.kpi-hero-sub{font-size:11px;opacity:.6;margin-top:4px}
 
-  .logo-text { 
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 18px; font-weight: 700;
-    color: var(--blanc);
-    line-height: 1.1;
-  }
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;text-align:center;box-shadow:var(--card-shadow)}
+.kpi-icon{font-size:22px;margin-bottom:4px}
+.kpi-val{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--texte)}
+.kpi-lbl{font-size:9px;color:var(--texte3);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
 
-  .logo-sub { font-size: 10px; color: var(--or); font-weight: 400; }
+/* SECTION */
+.section-title{font-size:11px;font-weight:700;color:var(--texte3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
 
-  .nav-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 12px 16px;
-    border-radius: 10px;
-    color: rgba(255,255,255,0.7);
-    cursor: pointer;
-    transition: all 0.2s;
-    margin-bottom: 4px;
-    font-size: 14px; font-weight: 500;
-    text-decoration: none;
-  }
+/* COMMANDE CARD */
+.cmd-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:10px;box-shadow:var(--card-shadow);position:relative;overflow:hidden}
+.cmd-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--or),var(--b))}
+.cmd-ref{font-family:'Playfair Display',serif;font-size:13px;font-weight:700;color:var(--b)}
+.cmd-client{font-size:11px;color:var(--texte3);margin-top:2px}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.3px}
+.b-nouveau{background:rgba(212,160,23,.12);color:#8B6914}
+.b-confirme{background:rgba(27,67,50,.1);color:var(--b)}
+.b-prep{background:rgba(52,73,94,.1);color:#2C3E50}
+.b-route{background:rgba(41,128,185,.1);color:#2980B9}
+.b-livre{background:rgba(27,67,50,.1);color:var(--b)}
+.b-annule{background:rgba(192,57,43,.1);color:var(--rouge)}
+.cmd-body{background:var(--bg2);border-radius:10px;padding:10px;margin:10px 0;font-size:12px}
+.cmd-total{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--texte)}
+.cmd-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.btn-action{padding:8px 12px;border-radius:8px;border:none;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;touch-action:manipulation;transition:.15s}
+.btn-action:active{transform:scale(.96)}
+.btn-primary{background:linear-gradient(135deg,var(--b),var(--b2));color:#fff;flex:2}
+.btn-secondary{background:var(--bg2);color:var(--texte2);border:1px solid var(--border)!important;flex:1}
+.btn-danger{background:rgba(192,57,43,.08);color:var(--rouge);border:1px solid rgba(192,57,43,.2)!important}
 
-  .nav-item:hover, .nav-item.active {
-    background: rgba(255,215,0,0.15);
-    color: var(--or);
-  }
+/* PRODUIT CARD */
+.prod-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;box-shadow:var(--card-shadow)}
+.prod-emoji{width:48px;height:48px;border-radius:12px;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.prod-nom{font-weight:700;font-size:13px;color:var(--texte)}
+.prod-prix{font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:var(--b);margin-top:2px}
+.prod-stock{font-size:10px;color:var(--texte3);margin-top:2px}
+.prod-actions{display:flex;gap:4px;margin-left:auto;flex-shrink:0}
+.btn-icon{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation}
 
-  .nav-item span { font-size: 18px; }
-
-  .sidebar-footer {
-    margin-top: auto;
-    padding: 16px;
-    background: rgba(255,255,255,0.05);
-    border-radius: 12px;
-    font-size: 12px;
-    color: rgba(255,255,255,0.5);
-    text-align: center;
-  }
-
-  .status-dot {
-    display: inline-block;
-    width: 8px; height: 8px;
-    background: #4caf50;
-    border-radius: 50%;
-    margin-right: 6px;
-    animation: pulse 2s infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-
-  /* MAIN */
-  .main {
-    margin-left: 240px;
-    padding: 32px;
-    min-height: 100vh;
-  }
-
-  .topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 32px;
-  }
-
-  .page-title {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 26px; font-weight: 700;
-    color: var(--texte);
-  }
-
-  .page-subtitle { font-size: 14px; color: var(--texte-light); margin-top: 2px; }
-
-  .refresh-btn {
-    display: flex; align-items: center; gap: 8px;
-    background: var(--vert);
-    color: var(--blanc);
-    border: none;
-    padding: 10px 20px;
-    border-radius: 10px;
-    font-size: 14px; font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-family: 'DM Sans', sans-serif;
-  }
-
-  .refresh-btn:hover { background: var(--vert-fonce); transform: translateY(-1px); }
-
-  /* KPI CARDS */
-  .kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 20px;
-    margin-bottom: 28px;
-  }
-
-  .kpi-card {
-    background: var(--blanc);
-    border-radius: var(--radius);
-    padding: 24px;
-    box-shadow: var(--shadow);
-    position: relative;
-    overflow: hidden;
-    transition: transform 0.2s;
-  }
-
-  .kpi-card:hover { transform: translateY(-3px); }
-
-  .kpi-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 4px;
-  }
-
-  .kpi-card.vert::before { background: var(--vert); }
-  .kpi-card.or::before { background: var(--or); }
-  .kpi-card.bleu::before { background: #2196F3; }
-  .kpi-card.rouge::before { background: var(--rouge); }
-
-  .kpi-icon {
-    width: 48px; height: 48px;
-    border-radius: 12px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px;
-    margin-bottom: 16px;
-  }
-
-  .kpi-card.vert .kpi-icon { background: var(--vert-clair); }
-  .kpi-card.or .kpi-icon { background: #fff9e6; }
-  .kpi-card.bleu .kpi-icon { background: #e3f2fd; }
-  .kpi-card.rouge .kpi-icon { background: #fdecea; }
-
-  .kpi-label { font-size: 12px; color: var(--texte-light); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-  .kpi-value { font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; color: var(--texte); }
-  .kpi-sub { font-size: 12px; color: var(--texte-light); margin-top: 4px; }
-
-  /* GRID 2 COL */
-  .grid-2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    margin-bottom: 28px;
-  }
-
-  .card {
-    background: var(--blanc);
-    border-radius: var(--radius);
-    padding: 24px;
-    box-shadow: var(--shadow);
-  }
-
-  .card-title {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 16px; font-weight: 600;
-    color: var(--texte);
-    margin-bottom: 20px;
-    display: flex; align-items: center; gap: 8px;
-  }
-
-  /* TABLE COMMANDES */
-  .table-full {
-    background: var(--blanc);
-    border-radius: var(--radius);
-    padding: 24px;
-    box-shadow: var(--shadow);
-    margin-bottom: 28px;
-  }
-
-  .table-header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 20px;
-  }
-
-  table { width: 100%; border-collapse: collapse; }
-
-  th {
-    text-align: left;
-    font-size: 11px; font-weight: 600;
-    color: var(--texte-light);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 8px 12px;
-    border-bottom: 2px solid var(--gris-bg);
-  }
-
-  td {
-    padding: 14px 12px;
-    font-size: 14px;
-    border-bottom: 1px solid #f5f5f5;
-    vertical-align: middle;
-  }
-
-  tr:last-child td { border-bottom: none; }
-  tr:hover td { background: var(--gris-bg); }
-
-  .badge {
-    display: inline-block;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 11px; font-weight: 600;
-    text-transform: capitalize;
-  }
-
-  .badge.nouveau { background: #e3f2fd; color: #1565c0; }
-  .badge.confirme { background: #e8f5e9; color: #2e7d32; }
-  .badge.livre { background: #f3e5f5; color: #6a1b9a; }
-  .badge.annule { background: #fdecea; color: #c62828; }
-
-  .phone { font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: var(--vert); }
-  .montant { font-family: 'Space Grotesk', sans-serif; font-weight: 600; color: var(--texte); }
-  .ref { font-size: 12px; color: var(--texte-light); font-family: monospace; }
-
-  /* PRODUITS POPULAIRES */
-  .produit-item {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 0;
-    border-bottom: 1px solid #f5f5f5;
-  }
-
-  .produit-item:last-child { border-bottom: none; }
-
-  .produit-info { display: flex; align-items: center; gap: 12px; }
-  .produit-emoji { font-size: 28px; }
-  .produit-nom { font-weight: 500; font-size: 14px; }
-  .produit-unite { font-size: 12px; color: var(--texte-light); }
-  .produit-prix { font-family: 'Space Grotesk', sans-serif; font-weight: 600; color: var(--vert); font-size: 14px; }
-
-  /* BARRE PROGRESS */
-  .progress-bar {
-    height: 6px;
-    background: var(--gris-bg);
-    border-radius: 3px;
-    margin-top: 6px;
-    overflow: hidden;
-  }
-
-  .progress-fill {
-    height: 100%;
-    background: var(--vert);
-    border-radius: 3px;
-    transition: width 1s ease;
-  }
-
-  /* WHATSAPP CARD */
-  .whatsapp-card {
-    background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
-    border-radius: var(--radius);
-    padding: 24px;
-    color: white;
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 28px;
-    box-shadow: 0 8px 32px rgba(37,211,102,0.3);
-  }
-
-  .wa-info h3 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
-  .wa-info p { font-size: 13px; opacity: 0.85; }
-
-  .wa-badge {
-    background: rgba(255,255,255,0.2);
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 13px; font-weight: 600;
-    display: flex; align-items: center; gap: 6px;
-  }
-
-  /* LOADING */
-  .loading {
-    display: flex; align-items: center; justify-content: center;
-    height: 200px;
-    flex-direction: column;
-    gap: 16px;
-    color: var(--texte-light);
-  }
-
-  .spinner {
-    width: 40px; height: 40px;
-    border: 3px solid var(--vert-clair);
-    border-top-color: var(--vert);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .error-msg {
-    background: #fdecea;
-    border: 1px solid #ef9a9a;
-    border-radius: 10px;
-    padding: 16px;
-    color: var(--rouge);
-    font-size: 14px;
-    text-align: center;
-  }
-
-  /* RESPONSIVE */
-  @media (max-width: 900px) {
-    .sidebar { width: 64px; }
-    .sidebar .logo-text, .sidebar .logo-sub, .nav-item span + * { display: none; }
-    .main { margin-left: 64px; padding: 16px; }
-    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-    .grid-2 { grid-template-columns: 1fr; }
-  }
-</style>
-<link rel="manifest" href="/manifest.json"><meta name="theme-color" content="#006633"><script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js")}</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<style>
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;padding:20px}
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(13,31,22,.6);z-index:500;display:none;align-items:flex-end;justify-content:center}
 .modal-overlay.open{display:flex}
-.modal{background:white;border-radius:20px;padding:28px;width:100%}
-.modal-title{font-size:18px;font-weight:700;margin-bottom:20px}
-.modal-btns{display:flex;gap:12px}
-.btn{padding:12px 20px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;border:none}
-.btn-outline{background:white;border:1.5px solid #dde8dd;color:var(--texte)}
-.btn-or{background:var(--vert);color:white}
-.stock-row{display:flex;align-items:center;gap:12px;padding:10px;background:#f5f7f5;border-radius:10px}
-.stock-emoji{font-size:22px}
-.stock-nom{flex:1;font-weight:600;font-size:13px}
-.stock-input{width:70px;padding:8px;border:1.5px solid #dde8dd;border-radius:8px;font-size:14px;text-align:center;font-family:inherit}
-.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:var(--vert);color:white;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;white-space:nowrap}
-.toast.show{opacity:1}
+.modal{background:var(--card);border-radius:24px 24px 0 0;padding:24px 20px 32px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
+.modal-title{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--texte);margin-bottom:16px}
+.form-group{margin-bottom:14px}
+.form-label{font-size:11px;font-weight:700;color:var(--texte3);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px}
+.form-input{width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;color:var(--texte);background:#fff;font-family:'DM Sans',sans-serif;outline:none}
+.form-input:focus{border-color:var(--b)}
+.form-select{width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;color:var(--texte);background:#fff;font-family:'DM Sans',sans-serif;outline:none;appearance:none}
+.btn-submit{width:100%;padding:14px;background:linear-gradient(135deg,var(--b),var(--b2));color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;margin-bottom:10px;touch-action:manipulation}
+.btn-cancel{width:100%;padding:12px;background:transparent;color:var(--texte3);border:1px solid var(--border);border-radius:10px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;touch-action:manipulation}
+
+/* EMPTY STATE */
+.empty-state{text-align:center;padding:40px 20px}
+.empty-icon{font-size:48px;margin-bottom:12px}
+.empty-title{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--texte);margin-bottom:6px}
+.empty-sub{font-size:12px;color:var(--texte3);margin-bottom:16px}
+.btn-empty{padding:10px 20px;background:linear-gradient(135deg,var(--b),var(--b2));color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif}
+
+/* TOAST */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1B4332;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:999;display:none;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.2)}
+
+/* FILTRE TABS */
+.filter-tabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:14px;padding-bottom:2px}
+.filter-tabs::-webkit-scrollbar{display:none}
+.ftab{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;color:var(--texte3);font-family:'DM Sans',sans-serif;touch-action:manipulation}
+.ftab.active{background:var(--b);color:#fff;border-color:var(--b)}
+
+/* FAB */
+.fab{position:fixed;bottom:72px;right:16px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--b),var(--b2));color:#fff;border:none;font-size:24px;cursor:pointer;box-shadow:0 4px 20px rgba(27,67,50,.3);z-index:200;display:flex;align-items:center;justify-content:center;touch-action:manipulation}
+
+/* GUIDE */
+.guide-banner{background:linear-gradient(135deg,var(--or),var(--or2));border-radius:14px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px}
+.guide-banner-icon{font-size:28px;flex-shrink:0}
+.guide-banner-text{flex:1}
+.guide-banner-title{font-size:13px;font-weight:700;color:#1C1208}
+.guide-banner-sub{font-size:11px;color:rgba(28,18,8,.6);margin-top:2px}
+.guide-banner-btn{padding:6px 14px;background:#1C1208;color:var(--or2);border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;flex-shrink:0}
+
+/* ACHETEUR CARD */
+.acheteur-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;box-shadow:var(--card-shadow)}
+.acheteur-avatar{width:44px;height:44px;border-radius:12px;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
 </style>
 </head>
 <body>
 
-<!-- LOGIN OVERLAY -->
-<div id="login-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
-  <div style="background:white;border-radius:20px;padding:32px 28px;width:90%;max-width:360px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.4)">
-    <div style="font-size:40px;margin-bottom:12px">🔐</div>
-    <div style="font-size:20px;font-weight:900;color:#0d1f0d;margin-bottom:4px">MarchandPro</div>
-    <div style="font-size:13px;color:#5a7a5a;margin-bottom:24px">Entrez votre PIN pour accéder à votre dashboard</div>
-    
-    <!-- Section PIN existant -->
-    <div id="pin-section">
-      <input id="pin-input" type="password" maxlength="4" inputmode="numeric" pattern="[0-9]*"
-        placeholder="• • • •"
-        style="width:100%;border:2px solid #e0ece0;border-radius:12px;padding:14px;font-size:24px;text-align:center;letter-spacing:8px;font-family:inherit;outline:none;margin-bottom:12px"
-        onkeydown="if(event.key==='Enter') submitPin()">
-      <button id="pin-btn" onclick="submitPin()"
-        style="width:100%;background:#006633;color:white;border:none;padding:14px;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit">
-        🔓 Accéder
-      </button>
-      <div style="margin-top:10px;font-size:11px;color:#888">
-        Première connexion ? PIN par défaut : <b>1234</b>
-      </div>
-    </div>
-    
-    <!-- Section nouveau PIN (premier accès) -->
-    <div id="set-pin-section" style="display:none">
-      <div style="background:#e8f5e9;border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:#006633;font-weight:700">
-        🎉 Bienvenue ! Définissez votre PIN personnel
-      </div>
-      <input id="new-pin-input" type="password" maxlength="4" inputmode="numeric" pattern="[0-9]*"
-        placeholder="Nouveau PIN (4 chiffres)"
-        style="width:100%;border:2px solid #e0ece0;border-radius:12px;padding:12px;font-size:18px;text-align:center;letter-spacing:6px;font-family:inherit;outline:none;margin-bottom:10px">
-      <input id="confirm-pin-input" type="password" maxlength="4" inputmode="numeric" pattern="[0-9]*"
-        placeholder="Confirmer PIN"
-        style="width:100%;border:2px solid #e0ece0;border-radius:12px;padding:12px;font-size:18px;text-align:center;letter-spacing:6px;font-family:inherit;outline:none;margin-bottom:12px">
-      <button onclick="submitNewPin()"
-        style="width:100%;background:#006633;color:white;border:none;padding:14px;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit">
-        ✅ Définir mon PIN
-      </button>
-    </div>
-    
-    <div id="pin-error" style="display:none;margin-top:12px;background:#fce4ec;color:#c0392b;padding:10px;border-radius:10px;font-size:13px;font-weight:700"></div>
-  </div>
-</div>
-
-<nav class="sidebar">
-  <div class="logo">
-    <div class="logo-icon">🛒</div>
-    <div>
-      <div class="logo-text">MarchandPro</div>
-      <div class="logo-sub">🇸🇳 Dakar, Sénégal</div>
-    </div>
-  </div>
-
-  <a class="nav-item active" href="#"><span>📊</span> Dashboard</a>
-  <a class="nav-item" href="#commandes"><span>📋</span> Commandes</a>
-  <a class="nav-item" href="#produits"><span>📦</span> Catalogue</a>
-  <a class="nav-item" href="#clients"><span>👥</span> Clients</a>
-  <a class="nav-item" href="#factures"><span>🧾</span> Factures</a>
-
-  <div class="sidebar-footer">
-    <div><span class="status-dot"></span>Serveur actif</div>
-    <div style="margin-top:6px">v2.0.0</div>
-  </div>
-</nav>
-
-<main class="main">
-  <div class="topbar">
-    <div>
-      <div class="page-title">Tableau de bord</div>
-      <div class="page-subtitle" id="last-update">Chargement...</div>
-    </div>
-    <div style="display:flex;gap:10px">
-      <button onclick="voirBilan()" style="background:#1565C0;color:white;border:none;padding:10px 18px;border-radius:50px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📊 Bilan</button>
-      <button class="refresh-btn" onclick="loadDashboard()">🔄 Actualiser</button>
-      <button class="refresh-btn" onclick="deconnexion()" style="background:#c0392b;margin-left:8px">🔒 Déconnexion</button>
-    </div>
-  </div>
-  <!-- WhatsApp Status -->
-  <div class="whatsapp-card">
-    <div class="wa-info">
-      <h3>📱 WhatsApp Bot Actif</h3>
-      <p>+221 71 128 84 39 — Réponse automatique 24h/24 avec IA Groq</p>
-    </div>
-    <div class="wa-badge">✅ En ligne</div>
-  </div>
-
-  <!-- KPIs -->
-  <div class="kpi-grid" id="kpi-grid">
-    <div class="loading"><div class="spinner"></div>Chargement...</div>
-  </div>
-
-  <!-- ANALYTICS CHARTS -->
-  <div class="grid-2">
-    <div class="card">
-      <div class="card-title">📈 Revenus 7 derniers jours</div>
-      <canvas id="chart-revenus" height="160"></canvas>
-    </div>
-    <div class="card">
-      <div class="card-title">🥧 Répartition statuts</div>
-      <canvas id="chart-statuts" height="160"></canvas>
-    </div>
-  </div>
-
-  <!-- Produits + Stock -->
-  <div class="grid-2">
-    <div class="card">
-      <div class="card-title">📦 Produits populaires</div>
-      <div id="produits-list"></div>
-    </div>
-    <div class="card">
-      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
-        <span>🏭 Gestion stock</span>
-        <button onclick="afficherModalStock()" style="background:var(--vert);color:white;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ Modifier</button>
-      </div>
-      <div id="stock-list"></div>
-    </div>
-  </div>
-
-  <!-- PROMOTION FLASH -->
-
-  <!-- CRÉDITS CLIENTS -->
-  <div class="table-full" style="margin-bottom:24px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div class="card-title" style="margin:0">💰 Crédits Clients</div>
-      <button onclick="ouvrirModalCredit()" style="background:linear-gradient(135deg,#c0392b,#e74c3c);color:white;border:none;padding:8px 18px;border-radius:50px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">+ Ajouter crédit</button>
-    </div>
-    <div id="credits-liste" style="background:#fff9f9;border:1.5px solid #fce4ec;border-radius:14px;padding:16px">
-      <div style="text-align:center;color:#888;font-size:13px">⏳ Chargement crédits...</div>
-    </div>
-    <div id="credits-total" style="margin-top:10px;text-align:right;font-size:13px;font-weight:800;color:#c0392b"></div>
-  </div>
-
-  <!-- MARGES -->
-  <div class="table-full" style="margin-bottom:24px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div class="card-title" style="margin:0">📊 Marges & Bénéfices</div>
-    </div>
-    <div id="marges-liste" style="background:#f9fcf9;border:1.5px solid #c8e6c9;border-radius:14px;padding:16px">
-      <div style="text-align:center;color:#888;font-size:13px">⏳ Chargement marges...</div>
-    </div>
-  </div>
-
-  <!-- CERTIFICAT -->
-  <div class="table-full" style="margin-bottom:24px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div class="card-title" style="margin:0">🏆 Certificat Grossiste</div>
-      <div style="display:flex;gap:8px">
-        <button onclick="genererCertificat()" style="background:#006633;color:white;border:none;padding:8px 18px;border-radius:50px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">🏆 Générer</button>
-        <button onclick="voirCertificat()" style="background:#e8f5e9;color:#006633;border:none;padding:8px 18px;border-radius:50px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">👁️ Voir</button>
-      </div>
-    </div>
-    <div style="background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border:2px solid #c8e6c9;border-radius:14px;padding:20px;text-align:center">
-      <div style="font-size:40px;margin-bottom:8px">🏆</div>
-      <div style="font-weight:800;font-size:16px;color:#006633;margin-bottom:6px">Certificat de Grossiste Digital</div>
-      <div style="font-size:13px;color:#5a7a5a;margin-bottom:14px">Prouvez votre sérieux avec un certificat officiel MarchandPro</div>
-      <div style="display:inline-block;background:#006633;color:white;font-size:12px;font-weight:800;padding:5px 14px;border-radius:20px">✅ Certifié MarchandPro</div>
-    </div>
-  </div>
-
-  <!-- MULTI-LIVREURS -->
-  <div class="table-full" style="margin-bottom:24px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div class="card-title" style="margin:0">🚚 Mes Livreurs</div>
-      <button onclick="ajouterLivreur()" style="background:linear-gradient(135deg,#1565C0,#1976D2);color:white;border:none;padding:8px 18px;border-radius:50px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">+ Ajouter livreur</button>
-    </div>
-    <div id="livreurs-liste" style="background:#f0f4ff;border:1.5px solid #bbdefb;border-radius:14px;padding:16px">
-      <div style="text-align:center;color:#888;font-size:13px">⏳ Chargement livreurs...</div>
-    </div>
-  </div>
-
-  <!-- PAIEMENTS ÉCHELONNÉS -->
-  <div class="table-full" style="margin-bottom:24px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div class="card-title" style="margin:0">💳 Paiements Échelonnés</div>
-      <button onclick="ouvrirModalEchelonne()" style="background:linear-gradient(135deg,#4527A0,#5E35B1);color:white;border:none;padding:8px 18px;border-radius:50px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">+ Nouveau</button>
-    </div>
-    <div id="echelonnes-liste" style="background:#f3e5f5;border:1.5px solid #ce93d8;border-radius:14px;padding:16px">
-      <div style="text-align:center;color:#888;font-size:13px">⏳ Chargement paiements...</div>
-    </div>
-  </div>
-
-  <!-- FOURNISSEURS -->
-  <div class="table-full" style="margin-bottom:24px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div class="card-title" style="margin:0">🏭 Mes Fournisseurs</div>
-      <button onclick="commanderFournisseur()" style="background:linear-gradient(135deg,#4527A0,#5E35B1);color:white;border:none;padding:8px 18px;border-radius:50px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">+ Commander</button>
-    </div>
-    <div id="fournisseurs-liste" style="background:#f4f0ff;border:1.5px solid #d1c4e9;border-radius:14px;padding:16px">
-      <div style="text-align:center;color:#888;font-size:13px">⏳ Chargement fournisseurs...</div>
-    </div>
-  </div>
-
-  <div class="table-full" style="margin-bottom:0">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div class="card-title" style="margin:0">🏷️ Promotion Flash</div>
-      <button onclick="ouvrirModalPromo()" style="background:linear-gradient(135deg,#FF6B35,#F7931E);color:white;border:none;padding:8px 18px;border-radius:50px;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 4px 16px rgba(255,107,53,0.35)">📣 Envoyer une promo</button>
-    </div>
-    <div style="background:linear-gradient(135deg,#fff9e6,#fffde7);border:2px dashed #FFD700;border-radius:14px;padding:18px;text-align:center">
-      <div style="font-size:32px;margin-bottom:8px">🏷️</div>
-      <div style="font-weight:700;font-size:15px;margin-bottom:6px">Envoyez une promo à tous vos clients</div>
-      <div style="font-size:13px;color:var(--texte-light);margin-bottom:14px">Vos clients WhatsApp reçoivent votre offre en quelques secondes</div>
-      <button onclick="ouvrirModalPromo()" style="background:#FFD700;color:#1a2e1a;border:none;padding:12px 28px;border-radius:50px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">📣 Lancer une promotion flash</button>
-    </div>
-  </div>
-
-  <!-- Table commandes -->
-  <div class="table-full">
-    <div class="table-header">
-      <div class="card-title" style="margin:0">📋 Commandes récentes</div>
-      <span style="font-size:13px;color:var(--texte-light)" id="commandes-count"></span>
-    </div>
-    <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-      <input id="search-input" type="text" placeholder="🔍 Rechercher CMD-0036, numéro, produit..."
-        style="flex:1;min-width:200px;padding:10px 16px;border-radius:10px;border:1.5px solid #dde8dd;font-size:14px;font-family:inherit;color:var(--texte);outline:none;background:white"
-        oninput="filtrerCommandes()" />
-      <button onclick="exportCSV()"
-        style="background:var(--vert);color:white;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">
-        ⬇️ Export CSV
-      </button>
-    </div>
-    <div id="commandes-table">
-      <div class="loading"><div class="spinner"></div></div>
-    </div>
-  </div>
-</main>
-
-<!-- MODAL PROMO FLASH -->
-<div class="modal-overlay" id="promo-modal">
-  <div class="modal" style="max-width:440px">
-    <div class="modal-title">🏷️ Promotion Flash</div>
-    <p style="font-size:13px;color:var(--texte-light);margin-bottom:20px">Votre message sera envoyé à <b id="promo-nb-clients">tous vos clients</b> WhatsApp instantanément.</p>
-
-    <div style="margin-bottom:14px">
-      <label style="font-size:13px;font-weight:700;display:block;margin-bottom:6px">📢 Message principal *</label>
-      <textarea id="promo-message" placeholder="Ex: Soldes sur le riz ! Stock limité, commandez maintenant !" style="width:100%;padding:12px;border:2px solid #dde8dd;border-radius:10px;font-family:inherit;font-size:13px;resize:vertical;min-height:80px;outline:none"></textarea>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
-      <div>
-        <label style="font-size:13px;font-weight:700;display:block;margin-bottom:6px">📦 Produit (optionnel)</label>
-        <input type="text" id="promo-produit" placeholder="Ex: Riz brisé 50kg" style="width:100%;padding:11px 12px;border:2px solid #dde8dd;border-radius:10px;font-family:inherit;font-size:13px;outline:none">
-      </div>
-      <div>
-        <label style="font-size:13px;font-weight:700;display:block;margin-bottom:6px">🎁 Remise % (optionnel)</label>
-        <input type="number" id="promo-remise" placeholder="Ex: 10" min="1" max="50" style="width:100%;padding:11px 12px;border:2px solid #dde8dd;border-radius:10px;font-family:inherit;font-size:13px;outline:none">
-      </div>
-    </div>
-
-    <div style="background:#e8f5e9;border-radius:10px;padding:12px;font-size:12px;color:var(--vert);margin-bottom:20px">
-      <b>Aperçu du message :</b><br>
-      🏷️ <b>PROMOTION FLASH chez votre boutique</b> 🇸🇳<br>
-      [Votre message]<br>
-      ⏰ Offre limitée — commandez maintenant !
-    </div>
-
-    <div style="display:flex;gap:12px">
-      <button onclick="fermerModalPromo()" style="flex:1;padding:13px;background:#f5f7f5;color:var(--texte);border:none;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit">Annuler</button>
-      <button onclick="envoyerPromo()" id="btn-envoyer-promo" style="flex:2;padding:13px;background:linear-gradient(135deg,#FF6B35,#F7931E);color:white;border:none;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;box-shadow:0 4px 16px rgba(255,107,53,0.3)">📣 Envoyer la promotion</button>
-    </div>
-  </div>
-</div>
-
-
-<div class="modal-overlay" id="stock-modal">
-  <div class="modal" style="max-width:500px;width:90%">
-    <div class="modal-title">🏭 Modifier le stock</div>
-    <div id="stock-form-list" style="display:grid;gap:10px;max-height:60vh;overflow-y:auto;padding:4px"></div>
-    <div class="modal-btns" style="margin-top:16px">
-      <button class="btn btn-outline" onclick="document.getElementById('stock-modal').classList.remove('open')">Annuler</button>
-      <button class="btn btn-or" onclick="sauvegarderStock()">✅ Sauvegarder</button>
-    </div>
+<!-- LOGIN -->
+<div id="login-overlay">
+  <div class="login-box">
+    <div class="login-logo">🏪</div>
+    <div class="login-title">MarchandPro</div>
+    <div class="login-sub">Entrez votre PIN pour accéder</div>
+    <input id="pin-input" type="number" inputmode="numeric" maxlength="4" placeholder="1234" class="login-input" autocomplete="off">
+    <button class="login-btn" type="button" onclick="loginPIN()">Accéder →</button>
+    <div class="login-hint">PIN par défaut : 1234</div>
+    <div id="login-error" class="login-error"></div>
+    <button class="login-forgot" onclick="afficherResetPin()">🔑 PIN oublié ?</button>
   </div>
 </div>
 
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<script>
-const API = 'https://marchandpro.up.railway.app';
+<!-- APP -->
+<div id="app" style="display:none">
 
-// ============================================
-// SYSTÈME LOGIN PIN
-// ============================================
-const urlParams = new URLSearchParams(window.location.search);
-const MERCHANT_ID = urlParams.get('merchant_id') || 1;
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-logo">🏪 MarchandPro</div>
+  <div class="nav-badge" id="nav-plan">GRATUIT</div>
+</nav>
 
-function getSession() {
-  try {
-    const s = sessionStorage.getItem('mp_session');
-    return s ? JSON.parse(s) : null;
-  } catch { return null; }
-}
+<!-- PAGES -->
 
-function setSession(data) {
-  try { sessionStorage.setItem('mp_session', JSON.stringify(data)); } catch {}
-}
-
-function clearSession() {
-  try { sessionStorage.removeItem('mp_session'); } catch {}
-}
-
-function checkLogin() {
-  const session = getSession();
-  if (!session || session.merchant_id != MERCHANT_ID) {
-    showLoginModal();
-    return false;
-  }
-  return true;
-}
-
-function showLoginModal() {
-  document.getElementById('login-overlay').style.display = 'flex';
-}
-
-function hideLoginModal() {
-  document.getElementById('login-overlay').style.display = 'none';
-}
-
-async async function submitPin() {
-  const pin = document.getElementById('pin-input').value;
-  const btn = document.getElementById('pin-btn');
-  const err = document.getElementById('pin-error');
-  
-  if (!pin || pin.length !== 4) {
-    err.textContent = '⚠️ Entrez votre PIN à 4 chiffres';
-    err.style.display = 'block';
-    return;
-  }
-  
-  btn.textContent = '⏳ Vérification...';
-  btn.disabled = true;
-  err.style.display = 'none';
-  
-  try {
-    const r = await fetch(`${API}/api/merchant/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ merchant_id: MERCHANT_ID, pin })
-    });
-    const data = await r.json();
-    
-    if (data.ok) {
-      setSession({ merchant_id: MERCHANT_ID, pin, nom: data.nom });
-      if (data.first_login) {
-        document.getElementById('set-pin-section').style.display = 'block';
-        document.getElementById('pin-section').style.display = 'none';
-        err.style.display = 'none';
-      } else {
-        hideLoginModal();
-        loadDashboard();
-      }
-    } else {
-      err.textContent = '❌ ' + (data.error || 'PIN incorrect');
-      err.style.display = 'block';
-    }
-  } catch(e) {
-    err.textContent = '❌ Erreur réseau';
-    err.style.display = 'block';
-  }
-  
-  btn.textContent = '🔓 Accéder';
-  btn.disabled = false;
-}
-
-async function submitNewPin() {
-  const nouveau = document.getElementById('new-pin-input').value;
-  const confirm = document.getElementById('confirm-pin-input').value;
-  const err = document.getElementById('pin-error');
-  
-  if (nouveau !== confirm) {
-    err.textContent = '⚠️ Les PINs ne correspondent pas';
-    err.style.display = 'block';
-    return;
-  }
-  if (!/^\d{4}$/.test(nouveau)) {
-    err.textContent = '⚠️ PIN doit être 4 chiffres';
-    err.style.display = 'block';
-    return;
-  }
-  
-  try {
-    const r = await fetch(`${API}/api/merchant/set-pin`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ merchant_id: MERCHANT_ID, nouveau_pin: nouveau })
-    });
-    const data = await r.json();
-    if (data.ok) {
-      setSession({ merchant_id: MERCHANT_ID, pin: nouveau });
-      hideLoginModal();
-      loadDashboard();
-    }
-  } catch(e) {
-    err.textContent = '❌ Erreur';
-    err.style.display = 'block';
-  }
-}
-
-function deconnexion() {
-  clearSession();
-  showLoginModal();
-}
-
-
-
-const PRODUITS_EMOJIS = {
-  'riz':'🌾','huile':'🫙','sucre':'🍚','farine':'🥖',
-  'mil':'🌾','tomate':'🥫','savon':'🧼','lait':'🥛'
-};
-
-const CATALOGUE_BASE = [
-  {nom:'Riz brisé',unite:'sac 50kg',prix:22000},
-  {nom:'Huile végétale',unite:'bidon 20L',prix:25000},
-  {nom:'Sucre',unite:'sac 50kg',prix:30000},
-  {nom:'Farine',unite:'sac 50kg',prix:20000},
-  {nom:'Mil',unite:'sac 50kg',prix:18000},
-  {nom:'Tomate concentrée',unite:'carton',prix:15000},
-  {nom:'Savon',unite:'carton',prix:12000},
-  {nom:'Lait en poudre',unite:'boite 2.5kg',prix:8500},
-];
-
-// Stock local (localStorage pour persistance)
-function getStock() {
-  try { return JSON.parse(localStorage.getItem('mp_stock') || '{}'); } catch(e) { return {}; }
-}
-function saveStock(s) { localStorage.setItem('mp_stock', JSON.stringify(s)); }
-
-function getEmoji(nom) {
-  const n = nom.toLowerCase();
-  for (const [k,v] of Object.entries(PRODUITS_EMOJIS)) { if(n.includes(k)) return v; }
-  return '📦';
-}
-function formatFCFA(n) { return parseInt(n).toLocaleString('fr-FR') + ' FCFA'; }
-function formatDate(d) { return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }
-
-let toutesCommandes = [];
-let chartRevenus = null;
-let chartStatuts = null;
-
-function toast(msg, ok=true) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.style.background = ok ? 'var(--vert)' : '#c0392b';
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
-}
-
-function getStatutStyle(s) {
-  if(s==='payé') return 'background:#e8f5e9;color:#006633;border:1.5px solid #006633';
-  if(s==='nouveau') return 'background:#fff9e6;color:#cc9900;border:1.5px solid #FFD700';
-  if(s==='livré') return 'background:#e3f0ff;color:#1a5fb4;border:1.5px solid #1a5fb4';
-  if(s==='annulé') return 'background:#fdecea;color:#c0392b;border:1.5px solid #c0392b';
-  return 'background:#f5f5f5;color:#666;border:1.5px solid #ccc';
-}
-function getStatutEmoji(s) {
-  if(s==='payé') return '✅'; if(s==='nouveau') return '🕐';
-  if(s==='livré') return '🚚'; if(s==='annulé') return '❌';
-  return '📋';
-}
-
-// ---- CHARTS ----
-function renderChartRevenus(commandes) {
-  const days = [];
-  const revenus = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate()-i);
-    const label = d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric'});
-    days.push(label);
-    const total = commandes
-      .filter(c => new Date(c.created_at).toDateString() === d.toDateString())
-      .reduce((s,c) => s + Number(c.total||0), 0);
-    revenus.push(Math.round(total/1000));
-  }
-  const ctx = document.getElementById('chart-revenus').getContext('2d');
-  if (chartRevenus) chartRevenus.destroy();
-  chartRevenus = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: days,
-      datasets: [{
-        label: 'Revenus (k FCFA)',
-        data: revenus,
-        backgroundColor: 'rgba(0,102,51,0.7)',
-        borderRadius: 8,
-        borderSkipped: false,
-      }]
-    },
-    options: {
-      responsive:true, plugins:{legend:{display:false}},
-      scales:{y:{beginAtZero:true,ticks:{callback:v=>v+'k'}},x:{grid:{display:false}}}
-    }
-  });
-}
-
-function renderChartStatuts(commandes) {
-  const count = {};
-  commandes.forEach(c => { count[c.status]=(count[c.status]||0)+1; });
-  const labels = Object.keys(count);
-  const data = Object.values(count);
-  const colors = labels.map(s => s==='payé'?'#006633':s==='nouveau'?'#FFD700':s==='livré'?'#1a5fb4':'#c0392b');
-  const ctx = document.getElementById('chart-statuts').getContext('2d');
-  if (chartStatuts) chartStatuts.destroy();
-  chartStatuts = new Chart(ctx, {
-    type: 'doughnut',
-    data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2 }] },
-    options: { responsive:true, plugins:{ legend:{ position:'bottom', labels:{font:{size:12}} } } }
-  });
-}
-
-// ---- STOCK ----
-function renderStock() {
-  const stock = getStock();
-  document.getElementById('stock-list').innerHTML = CATALOGUE_BASE.map(p => {
-    const qte = stock[p.nom] ?? null;
-    const alerte = qte !== null && qte <= 5;
-    return `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0f0">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span style="font-size:22px">${getEmoji(p.nom)}</span>
-          <div>
-            <div style="font-weight:600;font-size:13px">${p.nom}</div>
-            <div style="font-size:11px;color:var(--texte-light)">${p.unite}</div>
-          </div>
-        </div>
-        <div style="text-align:right">
-          ${qte !== null ? `
-            <div style="font-weight:700;font-size:16px;color:${alerte?'#c0392b':'var(--vert)'}">${qte}</div>
-            <div style="font-size:11px;color:${alerte?'#c0392b':'var(--texte-light)'}">${alerte?'⚠️ Stock faible':'en stock'}</div>
-          ` : `<div style="font-size:12px;color:var(--texte-light)">Non défini</div>`}
-        </div>
-      </div>`;
-  }).join('');
-}
-
-function afficherModalStock() {
-  const stock = getStock();
-  document.getElementById('stock-form-list').innerHTML = CATALOGUE_BASE.map(p => `
-    <div class="stock-row">
-      <span class="stock-emoji">${getEmoji(p.nom)}</span>
-      <span class="stock-nom">${p.nom}</span>
-      <input class="stock-input" type="number" min="0" id="stk-${p.nom.replace(/\s/g,'_')}"
-        value="${stock[p.nom] ?? ''}" placeholder="0" />
+<!-- ACCUEIL -->
+<div id="page-accueil" class="page active">
+  <div class="kpi-hero">
+    <div class="kpi-hero-label">💰 Revenus aujourd'hui</div>
+    <div class="kpi-hero-val" id="kpi-today">0 FCFA</div>
+    <div class="kpi-hero-sub" id="kpi-today-sub">Chargement...</div>
+  </div>
+  <div class="kpis">
+    <div class="kpi">
+      <div class="kpi-icon">📦</div>
+      <div class="kpi-val" id="kpi-cmds">—</div>
+      <div class="kpi-lbl">Commandes</div>
     </div>
-  `).join('');
-  document.getElementById('stock-modal').classList.add('open');
+    <div class="kpi">
+      <div class="kpi-icon">👥</div>
+      <div class="kpi-val" id="kpi-acheteurs">—</div>
+      <div class="kpi-lbl">Acheteurs</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-icon">🛒</div>
+      <div class="kpi-val" id="kpi-produits">—</div>
+      <div class="kpi-lbl">Produits</div>
+    </div>
+  </div>
+
+  <div id="guide-banner" class="guide-banner" style="display:none">
+    <div class="guide-banner-icon">👋</div>
+    <div class="guide-banner-text">
+      <div class="guide-banner-title">Bienvenue sur MarchandPro !</div>
+      <div class="guide-banner-sub">Suivez le guide pour démarrer en 3 minutes</div>
+    </div>
+    <button class="guide-banner-btn" onclick="demarrerGuide()">Démarrer</button>
+  </div>
+
+  <div class="section-title">🔔 Nouvelles commandes</div>
+  <div id="nouvelles-cmds"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">Aucune nouvelle commande</div><div class="empty-sub">Partagez votre lien à vos acheteurs</div></div></div>
+</div>
+
+<!-- COMMANDES -->
+<div id="page-commandes" class="page">
+  <div class="filter-tabs" id="filter-tabs">
+    <button class="ftab active" onclick="filtrerCommandes('tous',this)">Toutes</button>
+    <button class="ftab" onclick="filtrerCommandes('nouveau',this)">🕐 Nouvelles</button>
+    <button class="ftab" onclick="filtrerCommandes('confirmé',this)">✅ Confirmées</button>
+    <button class="ftab" onclick="filtrerCommandes('en route',this)">🚚 En route</button>
+    <button class="ftab" onclick="filtrerCommandes('livré',this)">🎉 Livrées</button>
+  </div>
+  <div id="liste-commandes"></div>
+</div>
+
+<!-- PRODUITS -->
+<div id="page-produits" class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <div class="section-title" style="margin:0">Mes produits</div>
+    <button onclick="ouvrirModalProduit()" style="padding:8px 14px;background:linear-gradient(135deg,var(--b),var(--b2));color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">+ Ajouter</button>
+  </div>
+  <div id="liste-produits"></div>
+</div>
+
+<!-- ACHETEURS -->
+<div id="page-acheteurs" class="page">
+  <div class="section-title">Mes acheteurs</div>
+  <div id="liste-acheteurs"></div>
+</div>
+
+<!-- PARAMÈTRES -->
+<div id="page-params" class="page">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px">
+    <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;margin-bottom:14px">🏪 Ma boutique</div>
+    <div class="form-group"><label class="form-label">Nom de la boutique</label><input class="form-input" id="p-nom"></div>
+    <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="p-desc" placeholder="Décrivez vos produits..."></div>
+    <div class="form-group"><label class="form-label">Ville</label><input class="form-input" id="p-ville"></div>
+    <div class="form-group"><label class="form-label">Zone / Quartier</label><input class="form-input" id="p-zone" placeholder="Ex: Médina, Plateau..."></div>
+    <button onclick="sauvegarderProfil()" class="btn-submit" style="margin-top:4px">✅ Enregistrer</button>
+  </div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px">
+    <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;margin-bottom:14px">🔐 Sécurité</div>
+    <div class="form-group"><label class="form-label">PIN actuel</label><input class="form-input" id="pin-actuel" type="password" maxlength="4" inputmode="numeric"></div>
+    <div class="form-group"><label class="form-label">Nouveau PIN</label><input class="form-input" id="pin-nouveau" type="password" maxlength="4" inputmode="numeric"></div>
+    <div class="form-group"><label class="form-label">Confirmer PIN</label><input class="form-input" id="pin-confirm" type="password" maxlength="4" inputmode="numeric"></div>
+    <div id="pin-msg" style="font-size:12px;margin-bottom:8px;min-height:16px"></div>
+    <button onclick="changerPIN()" class="btn-submit">🔐 Changer le PIN</button>
+  </div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px">
+    <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;margin-bottom:8px">📲 Lien acheteur</div>
+    <div style="font-size:12px;color:var(--texte3);margin-bottom:10px">Partagez ce lien à vos acheteurs pour recevoir des commandes</div>
+    <div id="lien-acheteur" style="background:var(--bg2);border-radius:8px;padding:10px;font-size:11px;color:var(--texte2);word-break:break-all;margin-bottom:10px"></div>
+    <button onclick="copierLien()" style="width:100%;padding:10px;background:rgba(27,67,50,.08);color:var(--b);border:1px solid var(--border);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">📋 Copier le lien</button>
+  </div>
+  <button onclick="seDeconnecter()" style="width:100%;padding:12px;background:transparent;color:var(--rouge);border:1px solid rgba(192,57,43,.2);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">🔒 Déconnexion</button>
+</div>
+
+</div><!-- end app -->
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav" id="bottom-nav" style="display:none">
+  <button class="bnav-tab active" onclick="showPage('accueil',this)"><span>📊</span>Accueil</button>
+  <button class="bnav-tab" onclick="showPage('commandes',this)"><span>📦</span>Commandes</button>
+  <button class="bnav-tab" onclick="showPage('produits',this)"><span>🛒</span>Produits</button>
+  <button class="bnav-tab" onclick="showPage('acheteurs',this)"><span>👥</span>Acheteurs</button>
+  <button class="bnav-tab" onclick="showPage('params',this)"><span>⚙️</span>Paramètres</button>
+</div>
+
+<!-- MODAL COMMANDE -->
+<div class="modal-overlay" id="modal-commande">
+  <div class="modal">
+    <div class="modal-title">📦 Nouvelle commande</div>
+    <div class="form-group"><label class="form-label">Téléphone acheteur *</label><input class="form-input" id="cmd-phone" type="tel" placeholder="Ex: 221 77 123 45 67"></div>
+    <div class="form-group"><label class="form-label">Nom acheteur</label><input class="form-input" id="cmd-nom" placeholder="Prénom et nom"></div>
+    <div class="form-group"><label class="form-label">Produit *</label><select class="form-select" id="cmd-produit"></select></div>
+    <div class="form-group"><label class="form-label">Quantité</label><input class="form-input" id="cmd-qte" type="number" value="1" min="1"></div>
+    <div class="form-group"><label class="form-label">Adresse livraison</label><input class="form-input" id="cmd-adresse" placeholder="Quartier, rue..."></div>
+    <div class="form-group"><label class="form-label">Notes</label><input class="form-input" id="cmd-notes" placeholder="Instructions spéciales..."></div>
+    <button class="btn-submit" onclick="creerCommande()">✅ Créer commande</button>
+    <button class="btn-cancel" onclick="fermerModal('modal-commande')">Annuler</button>
+  </div>
+</div>
+
+<!-- MODAL PRODUIT -->
+<div class="modal-overlay" id="modal-produit">
+  <div class="modal">
+    <div class="modal-title" id="modal-produit-title">🛒 Nouveau produit</div>
+    <div class="form-group"><label class="form-label">Nom du produit *</label><input class="form-input" id="prod-nom" placeholder="Ex: Riz brisé"></div>
+    <div class="form-group"><label class="form-label">Emoji</label><input class="form-input" id="prod-emoji" placeholder="📦" maxlength="2"></div>
+    <div class="form-group"><label class="form-label">Prix unitaire (FCFA) *</label><input class="form-input" id="prod-prix" type="number" placeholder="500"></div>
+    <div class="form-group"><label class="form-label">Prix de gros (FCFA)</label><input class="form-input" id="prod-prix-gros" type="number" placeholder="450"></div>
+    <div class="form-group"><label class="form-label">Unité</label><select class="form-select" id="prod-unite">
+      <option value="kg">kg</option><option value="litre">litre</option>
+      <option value="unité">unité</option><option value="sac">sac</option>
+      <option value="carton">carton</option><option value="bouteille">bouteille</option>
+    </select></div>
+    <div class="form-group"><label class="form-label">Stock</label><input class="form-input" id="prod-stock" type="number" placeholder="100"></div>
+    <div class="form-group"><label class="form-label">Catégorie</label><select class="form-select" id="prod-cat">
+      <option value="alimentation">🌾 Alimentation</option>
+      <option value="hygiène">🧼 Hygiène</option>
+      <option value="textile">👗 Textile</option>
+      <option value="électronique">📱 Électronique</option>
+      <option value="quincaillerie">🔧 Quincaillerie</option>
+      <option value="cosmétiques">💄 Cosmétiques</option>
+      <option value="général">📦 Général</option>
+    </select></div>
+    <input type="hidden" id="prod-edit-id">
+    <button class="btn-submit" onclick="sauvegarderProduit()">✅ Enregistrer</button>
+    <button class="btn-cancel" onclick="fermerModal('modal-produit')">Annuler</button>
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;
+const params = new URLSearchParams(window.location.search);
+const MARCHAND_ID = parseInt(params.get('id')) || 1;
+let marchandData = null;
+let produits = [];
+let commandesFiltrees = 'tous';
+
+// ── LOGIN ──
+function loginPIN(){
+  const pin = (document.getElementById('pin-input').value||'').replace(/[^0-9]/g,'').substring(0,4);
+  validerPIN(pin);
 }
 
-function sauvegarderStock() {
-  const stock = {};
-  CATALOGUE_BASE.forEach(p => {
-    const id = 'stk-' + p.nom.replace(/\s/g,'_');
-    const val = document.getElementById(id)?.value;
-    if (val !== '' && val !== null && val !== undefined) stock[p.nom] = parseInt(val) || 0;
-  });
-  saveStock(stock);
-  document.getElementById('stock-modal').classList.remove('open');
-  renderStock();
-  toast('✅ Stock mis à jour !');
-}
-
-// ---- COMMANDES ----
-function renderCommandes(commandes) {
-  document.getElementById('commandes-count').textContent = `${commandes.length} commandes`;
-  document.getElementById('commandes-table').innerHTML = `
-    <table>
-      <thead><tr>
-        <th>Référence</th><th>Client</th><th>Produits</th>
-        <th>Total</th><th>Statut</th><th>Date</th><th>Facture</th>
-      </tr></thead>
-      <tbody>
-        ${commandes.map(cmd => `
-          <tr>
-            <td><span class="ref">CMD-${String(cmd.id).padStart(4,'0')}</span></td>
-            <td><span class="phone">+${cmd.customer_phone}</span></td>
-            <td style="font-size:13px">
-              ${(cmd.items||[]).filter(it=>it.produit&&it.produit.length>1)
-                .map(it=>`${getEmoji(it.produit)} ${it.quantite}x ${it.produit}`).join('<br>')}
-            </td>
-            <td><span class="montant">${formatFCFA(cmd.total)}</span></td>
-            <td>
-              <select onchange="changerStatut(${cmd.id}, this.value)" style="border:2px solid #e8f5e9;border-radius:8px;padding:5px 8px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;background:white;color:#0d1f0d">
-                <option value="nouveau" ${cmd.status==='nouveau'?'selected':''}>🕐 Nouveau</option>
-                <option value="confirmé" ${cmd.status==='confirmé'?'selected':''}>✅ Confirmé</option>
-                <option value="en route" ${cmd.status==='en route'?'selected':''}>🚚 En route</option>
-                <option value="livré" ${cmd.status==='livré'?'selected':''}>📦 Livré</option>
-                <option value="annulé" ${cmd.status==='annulé'?'selected':''}>❌ Annulé</option>
-              </select>
-            </td>
-            <td style="font-size:12px;color:var(--texte-light)">${formatDate(cmd.created_at)}</td>
-            <td>
-              <a href="${API}/api/facture/${cmd.id}" target="_blank"
-              style="display:inline-block;background:var(--vert-clair);color:var(--vert);padding:6px 10px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;border:1px solid var(--vert);margin-right:4px">
-              🧾 Voir</a>
-              <a href="${API}/api/facture/${cmd.id}/pdf" target="_blank"
-              style="display:inline-block;background:#e3f2fd;color:#1565C0;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;border:1px solid #1565C0">
-              ⬇️ PDF</a>
-            </td>
-          </tr>`).join('')}
-      </tbody>
-    </table>`;
-}
-
-function filtrerCommandes() {
-  const q = document.getElementById('search-input').value.toLowerCase();
-  if (!q) { renderCommandes(toutesCommandes); return; }
-  renderCommandes(toutesCommandes.filter(cmd => {
-    const ref = `cmd-${String(cmd.id).padStart(4,'0')}`;
-    const phone = (cmd.customer_phone||'').toLowerCase();
-    const produits = (cmd.items||[]).map(i=>i.produit||'').join(' ').toLowerCase();
-    return ref.includes(q)||phone.includes(q)||produits.includes(q)||(cmd.status||'').includes(q);
-  }));
-}
-
-function exportCSV() {
-  const headers = ['Référence','Client','Produits','Total FCFA','Statut','Date'];
-  const rows = toutesCommandes.map(cmd => [
-    `CMD-${String(cmd.id).padStart(4,'0')}`,
-    `+${cmd.customer_phone}`,
-    (cmd.items||[]).filter(i=>i.produit&&i.produit.length>1).map(i=>`${i.quantite}x ${i.produit}`).join(' | '),
-    cmd.total, cmd.status, new Date(cmd.created_at).toLocaleDateString('fr-FR')
-  ]);
-  const csv = [headers,...rows].map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
-  const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href=url; a.download=`marchandpro-${new Date().toISOString().slice(0,10)}.csv`; a.click();
-}
-
-// ---- MAIN ----
-async function loadDashboard() {
-  try {
-    const res = await fetch(`${API}/dashboard`);
-    const data = await res.json();
-
-    document.getElementById('last-update').textContent = 'Mis à jour à ' + new Date().toLocaleTimeString('fr-FR');
-
-    const { commandes, revenus_fcfa, impayes, clients } = data.kpis;
-    const commandesData = data.commandes_recentes || [];
-    toutesCommandes = commandesData;
-
-    // KPIs
-    const cmdAujourdhui = commandesData.filter(c => new Date(c.created_at).toDateString() === new Date().toDateString()).length;
-    document.getElementById('kpi-grid').innerHTML = `
-      <div class="kpi-card vert"><div class="kpi-icon">📋</div><div class="kpi-label">Commandes totales</div><div class="kpi-value">${commandes}</div><div class="kpi-sub">+${cmdAujourdhui} aujourd'hui</div></div>
-      <div class="kpi-card or"><div class="kpi-icon">💰</div><div class="kpi-label">Revenus</div><div class="kpi-value">${(revenus_fcfa/1000000).toFixed(2)}M</div><div class="kpi-sub">${formatFCFA(revenus_fcfa)}</div></div>
-      <div class="kpi-card bleu"><div class="kpi-icon">👥</div><div class="kpi-label">Clients actifs</div><div class="kpi-value">${clients}</div><div class="kpi-sub">Numéros uniques</div></div>
-      <div class="kpi-card rouge"><div class="kpi-icon">🧾</div><div class="kpi-label">Impayés</div><div class="kpi-value">${impayes}</div><div class="kpi-sub">En attente</div></div>
-    `;
-
-    // Charts
-    renderChartRevenus(commandesData);
-    renderChartStatuts(commandesData);
-
-    // Produits populaires
-    const produitCount = {};
-    commandesData.forEach(cmd => {
-      (cmd.items||[]).forEach(item => {
-        if(item.produit&&item.produit.length>1)
-          produitCount[item.produit]=(produitCount[item.produit]||0)+item.quantite;
-      });
+async function validerPIN(pin){
+  const err = document.getElementById('login-error');
+  if(!pin||pin.length<4){ err.textContent='Entrez 4 chiffres'; return; }
+  err.textContent='';
+  try{
+    const r = await fetch(`${API}/api/marchand/login`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ marchand_id: MARCHAND_ID, pin })
     });
-    const produitsSorted = Object.entries(produitCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
-    const maxQty = produitsSorted[0]?.[1]||1;
-    document.getElementById('produits-list').innerHTML = produitsSorted.length ?
-      produitsSorted.map(([nom,qty])=>`
-        <div class="produit-item">
-          <div class="produit-info">
-            <span class="produit-emoji">${getEmoji(nom)}</span>
-            <div>
-              <div class="produit-nom">${nom}</div>
-              <div class="produit-unite">${qty} unités commandées</div>
-              <div class="progress-bar"><div class="progress-fill" style="width:${(qty/maxQty*100).toFixed(0)}%"></div></div>
-            </div>
-          </div>
-        </div>`).join('') :
-      '<div style="color:var(--texte-light);text-align:center;padding:20px">Aucune donnée</div>';
-
-    // Stock
-    renderStock();
-    renderCommandes(commandesData);
-
-  } catch(err) {
-    document.getElementById('kpi-grid').innerHTML = `<div class="error-msg" style="grid-column:1/-1">❌ Erreur: ${err.message}</div>`;
-  }
-}
-
-
-// ── PROMO FLASH ──
-function ouvrirModalPromo() {
-  document.getElementById('promo-modal').classList.add('open');
-}
-
-function fermerModalPromo() {
-  document.getElementById('promo-modal').classList.remove('open');
-  document.getElementById('promo-message').value = '';
-  document.getElementById('promo-produit').value = '';
-  document.getElementById('promo-remise').value = '';
-}
-
-async function envoyerPromo() {
-  const message = document.getElementById('promo-message').value.trim();
-  const produit = document.getElementById('promo-produit').value.trim();
-  const remise = document.getElementById('promo-remise').value.trim();
-
-  if (!message) { toast('❌ Écrivez un message de promotion !'); return; }
-
-  // Récupérer merchant_id depuis l'URL ou le dashboard
-  const urlParams = new URLSearchParams(window.location.search);
-  const mid = urlParams.get('merchant_id') || 1;
-  const tok = urlParams.get('token') || '';
-
-  const btn = document.getElementById('btn-envoyer-promo');
-  btn.textContent = '⏳ Envoi en cours...';
-  btn.disabled = true;
-
-  try {
-    const res = await fetch(`${API}/api/promo`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
-      body: JSON.stringify({ merchant_id: mid, message, produit: produit || null, remise: remise || null })
-    });
-    const data = await res.json();
-    fermerModalPromo();
-    toast(`✅ Promotion envoyée à ${data.envoyes} client(s) !`);
-  } catch(e) {
-    toast('❌ Erreur lors de l\'envoi');
-  } finally {
-    btn.textContent = '📣 Envoyer la promotion';
-    btn.disabled = false;
-  }
-}
-
-// ── BILAN MENSUEL ──
-function voirBilan() {
-  const now = new Date();
-  const mois = now.getMonth() + 1;
-  const annee = now.getFullYear();
-  const urlParams = new URLSearchParams(window.location.search);
-  const mid = urlParams.get('merchant_id') || 1;
-  const tok = urlParams.get('token') || '';
-  window.open(`${API}/api/bilan/${mid}?mois=${mois}&annee=${annee}&token=${tok}`, '_blank');
-}
-
-// ── CHANGER STATUT COMMANDE ──
-async function changerStatut(id, statut) {
-  try {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tok = urlParams.get('token') || '';
-    const r = await fetch(`${API}/api/orders/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
-      body: JSON.stringify({ status: statut })
-    });
-    if (r.ok) {
-      toast(`✅ Statut mis à jour : ${statut}`);
+    const d = await r.json();
+    if(d.ok){
+      marchandData = d.marchand;
+      try{ localStorage.setItem('mp_sess_'+MARCHAND_ID, JSON.stringify({data:d.marchand, pin, expire: Date.now()+30*24*60*60*1000})); }catch(e){}
+      demarrerApp();
     } else {
-      toast('❌ Erreur mise à jour statut');
+      err.textContent = '❌ PIN incorrect';
+      document.getElementById('pin-input').value='';
     }
-  } catch(e) { toast('❌ Erreur: ' + e.message); }
+  }catch(e){ err.textContent='Erreur réseau'; }
 }
 
-// ============================================
-// CRÉDITS CLIENTS
-// ============================================
-async function chargerCredits() {
-  try {
-    const mid = MERCHANT_ID;
-    const r = await fetch(`${API}/api/credits/${mid}`);
-    const credits = await r.json();
-    const el = document.getElementById('credits-liste');
-    const tot = document.getElementById('credits-total');
-    if (!credits.length) {
-      el.innerHTML = '<div style="text-align:center;color:#888;font-size:13px;padding:10px">✅ Aucun crédit en cours</div>';
-      tot.textContent = '';
-      return;
+function verifierSession(){
+  try{
+    const sess = JSON.parse(localStorage.getItem('mp_sess_'+MARCHAND_ID)||'null');
+    if(sess && sess.expire > Date.now() && sess.data){ marchandData = sess.data; demarrerApp(); return true; }
+  }catch(e){}
+  return false;
+}
+
+function demarrerApp(){
+  document.getElementById('login-overlay').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('bottom-nav').style.display='flex';
+  initialiserApp();
+}
+
+function seDeconnecter(){
+  try{ localStorage.removeItem('mp_sess_'+MARCHAND_ID); }catch(e){}
+  location.reload();
+}
+
+window.addEventListener('DOMContentLoaded', ()=>{
+  if(!verifierSession()){
+    document.getElementById('login-overlay').style.display='flex';
+  }
+});
+
+document.getElementById('pin-input').addEventListener('keyup', e=>{
+  if(document.getElementById('pin-input').value.length===4) loginPIN();
+});
+
+// ── INIT APP ──
+async function initialiserApp(){
+  // Nom boutique dans nav
+  document.getElementById('nav-plan').textContent = (marchandData.plan||'gratuit').toUpperCase();
+  // Lien acheteur
+  const lien = `${API}/commande?id=${MARCHAND_ID}`;
+  const el = document.getElementById('lien-acheteur');
+  if(el) el.textContent = lien;
+  // Charger params
+  document.getElementById('p-nom').value = marchandData.nom_boutique||'';
+  document.getElementById('p-desc').value = marchandData.description||'';
+  document.getElementById('p-ville').value = marchandData.ville||'Dakar';
+  document.getElementById('p-zone').value = marchandData.zone||'';
+  // Guide si nouveau
+  const isNew = !localStorage.getItem('mp_guided_'+MARCHAND_ID);
+  if(isNew) document.getElementById('guide-banner').style.display='flex';
+  // Charger données
+  chargerDashboard();
+  chargerProduits();
+  setInterval(chargerDashboard, 30000);
+}
+
+// ── DASHBOARD ──
+async function chargerDashboard(){
+  try{
+    const r = await fetch(`${API}/api/stats/${MARCHAND_ID}`);
+    const s = await r.json();
+    document.getElementById('kpi-today').textContent = Number(s.revenus_aujourd_hui||0).toLocaleString('fr-FR')+' FCFA';
+    document.getElementById('kpi-today-sub').textContent = `Total: ${Number(s.revenus_total||0).toLocaleString('fr-FR')} FCFA`;
+    document.getElementById('kpi-cmds').textContent = s.nb_commandes||0;
+    document.getElementById('kpi-acheteurs').textContent = s.nb_acheteurs||0;
+    document.getElementById('kpi-produits').textContent = s.nb_produits||0;
+    // Nouvelles commandes
+    const r2 = await fetch(`${API}/api/commandes/${MARCHAND_ID}?statut=nouveau`);
+    const cmds = await r2.json();
+    const el = document.getElementById('nouvelles-cmds');
+    if(!cmds.length){
+      el.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">Aucune nouvelle commande</div><div class="empty-sub">Partagez votre lien à vos acheteurs</div><button class="btn-empty" onclick="copierLien()">📋 Copier le lien</button></div>';
+    } else {
+      el.innerHTML = cmds.map(c=>renderCommande(c)).join('');
     }
-    const total = credits.reduce((s, c) => s + Number(c.montant), 0);
-    el.innerHTML = credits.map(c => `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #fce4ec">
-        <div>
-          <div style="font-weight:800;font-size:13px">${c.client_name || c.client_phone}</div>
-          <div style="font-size:11px;color:#888">${c.client_phone}</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-weight:900;font-size:15px;color:#c0392b">${Number(c.montant).toLocaleString('fr-FR')} FCFA</div>
-          <button onclick="rembourserCredit('${c.client_phone}','${c.client_name}')" style="background:#e8f5e9;color:#006633;border:none;font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;cursor:pointer;margin-top:3px">✅ Rembours.</button>
-        </div>
-      </div>`).join('');
-    tot.innerHTML = `💵 Total crédits : <span style="color:#c0392b">${total.toLocaleString('fr-FR')} FCFA</span>`;
-  } catch(e) { console.error(e); }
+  }catch(e){}
 }
 
-async function ouvrirModalCredit() {
-  const nom = prompt('Nom du client :');
-  if (!nom) return;
-  const phone = prompt('Numéro WhatsApp (ex: 221701234567) :');
-  if (!phone) return;
-  const montant = prompt('Montant du crédit (FCFA) :');
-  if (!montant || isNaN(montant)) return;
-  ajouterCredit(phone, nom, parseFloat(montant), 'ajout');
-}
-
-async function ajouterCredit(phone, nom, montant, type) {
-  try {
-    const r = await fetch(`${API}/api/credits`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ merchant_id: MERCHANT_ID, client_phone: phone, client_name: nom, montant, type })
-    });
-    const data = await r.json();
-    if (data.ok) { alert('✅ Crédit enregistré !'); chargerCredits(); }
-  } catch(e) { alert('Erreur : ' + e.message); }
-}
-
-async function rembourserCredit(phone, nom) {
-  const montant = prompt(`Montant remboursé par ${nom} (FCFA) :`);
-  if (!montant || isNaN(montant)) return;
-  await ajouterCredit(phone, nom, parseFloat(montant), 'remboursement');
-}
-
-// ============================================
-// MARGES & BÉNÉFICES
-// ============================================
-async function chargerMarges() {
-  try {
-    const r = await fetch(`${API}/api/marges/${MERCHANT_ID}`);
-    const marges = await r.json();
-    const el = document.getElementById('marges-liste');
-    if (!marges.length) {
-      el.innerHTML = '<div style="text-align:center;color:#888;font-size:13px;padding:10px">Aucun produit trouvé</div>';
-      return;
+// ── COMMANDES ──
+async function chargerCommandes(statut='tous'){
+  const el = document.getElementById('liste-commandes');
+  el.innerHTML='<div style="text-align:center;padding:20px;color:var(--texte3)">⏳ Chargement...</div>';
+  try{
+    const url = statut==='tous' ? `${API}/api/commandes/${MARCHAND_ID}` : `${API}/api/commandes/${MARCHAND_ID}?statut=${encodeURIComponent(statut)}`;
+    const r = await fetch(url);
+    const cmds = await r.json();
+    if(!cmds.length){
+      el.innerHTML='<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-title">Aucune commande</div><div class="empty-sub">Les commandes de vos acheteurs apparaîtront ici</div></div>';
+    } else {
+      el.innerHTML = cmds.map(c=>renderCommande(c)).join('');
     }
-    el.innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 80px;gap:8px;padding:8px 0;border-bottom:2px solid #c8e6c9;font-size:10px;font-weight:800;color:#5a7a5a">
-        <div>Produit</div><div>Prix vente</div><div>Prix achat</div><div>Bénéfice</div><div>Marge</div>
-      </div>` +
-      marges.map(m => `
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 80px;gap:8px;padding:9px 0;border-bottom:1px solid #f0f0f0;align-items:center">
-        <div style="font-weight:700;font-size:12px">${m.nom}</div>
-        <div style="font-size:12px">${Number(m.prix_vente).toLocaleString('fr-FR')} F</div>
-        <div>
-          ${m.prix_achat > 0
-            ? `<span style="font-size:12px">${Number(m.prix_achat).toLocaleString('fr-FR')} F</span>`
-            : `<button onclick="saisirPrixAchat('${m.nom}')" style="background:#e8f5e9;color:#006633;border:none;font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;cursor:pointer">+ Saisir</button>`
-          }
-        </div>
-        <div style="font-weight:800;font-size:12px;color:${m.benefice_unitaire > 0 ? '#006633' : '#c0392b'}">${m.benefice_unitaire > 0 ? '+' : ''}${Number(m.benefice_unitaire).toLocaleString('fr-FR')} F</div>
-        <div>
-          ${m.marge_pct !== null
-            ? `<span style="background:${m.alerte ? '#fff3e0' : '#e8f5e9'};color:${m.alerte ? '#e65100' : '#006633'};font-size:11px;font-weight:800;padding:3px 8px;border-radius:10px">${m.marge_pct}%</span>`
-            : `<span style="color:#aaa;font-size:11px">—</span>`
-          }
-        </div>
-      </div>`).join('');
-  } catch(e) { console.error(e); }
+  }catch(e){ el.innerHTML='<div style="color:var(--rouge);padding:20px;text-align:center">Erreur de chargement</div>'; }
 }
 
-async function saisirPrixAchat(nomProduit) {
-  const prix = prompt(`Prix d'achat pour "${nomProduit}" (FCFA) :`);
-  if (!prix || isNaN(prix)) return;
-  try {
-    await fetch(`${API}/api/products/${MERCHANT_ID}/${encodeURIComponent(nomProduit)}/marge`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prix_achat: parseFloat(prix) })
-    });
-    chargerMarges();
-  } catch(e) { alert('Erreur : ' + e.message); }
+function filtrerCommandes(statut, btn){
+  commandesFiltrees = statut;
+  document.querySelectorAll('.ftab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  chargerCommandes(statut);
 }
 
-// ============================================
-// CERTIFICAT GROSSISTE
-// ============================================
-async function genererCertificat() {
-  try {
-    const r = await fetch(`${API}/api/certificat/${MERCHANT_ID}`, { method: 'POST' });
-    const data = await r.json();
-    if (data.ok) {
-      alert(`✅ Certificat généré !\nNuméro : ${data.numero}`);
-    }
-  } catch(e) { alert('Erreur : ' + e.message); }
+function renderCommande(c){
+  const items = Array.isArray(c.items)?c.items:JSON.parse(c.items||'[]');
+  const resume = items.map(i=>`${i.quantite}x ${i.nom}`).join(' · ');
+  const date = new Date(c.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+  const badges = {nouveau:'b-nouveau 🕐 Nouveau',confirmé:'b-confirme ✅ Confirmé',preparation:'b-prep 👨‍🍳 Préparation','en route':'b-route 🚚 En route',livré:'b-livre ✅ Livré',annulé:'b-annule ❌ Annulé'};
+  const [badgeClass, badgeText] = (badges[c.statut]||'b-nouveau 🕐 Nouveau').split(' ').reduce((a,v,i)=>i===0?[v,'']:[a[0],a[1]+' '+v],['','']);
+  
+  let btns = '';
+  if(c.statut==='nouveau') btns=`<button class="btn-action btn-primary" onclick="changerStatut(${c.id},'confirmé')">✅ Confirmer</button><button class="btn-action btn-secondary btn-danger" onclick="changerStatut(${c.id},'annulé')">❌</button>`;
+  else if(c.statut==='confirmé') btns=`<button class="btn-action btn-primary" onclick="changerStatut(${c.id},'en route')">🚚 En route</button>`;
+  else if(c.statut==='en route') btns=`<button class="btn-action btn-primary" onclick="changerStatut(${c.id},'livré')">🎉 Livré</button>`;
+
+  return `<div class="cmd-card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+      <div><div class="cmd-ref">${c.reference}</div><div class="cmd-client">${c.acheteur_nom||c.acheteur_phone} · ${date}</div></div>
+      <span class="badge ${badgeClass}">${badgeText.trim()}</span>
+    </div>
+    <div class="cmd-body">
+      <div style="font-weight:600;color:var(--texte)">${resume||'Commande'}</div>
+      ${c.adresse_livraison?`<div style="font-size:11px;color:var(--texte3);margin-top:4px">📍 ${c.adresse_livraison}</div>`:''}
+      ${c.livreur_nom?`<div style="font-size:11px;color:var(--vert);margin-top:4px;font-weight:600">🚴 ${c.livreur_nom}</div>`:''}
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div class="cmd-total">${Number(c.total).toLocaleString('fr-FR')} <span style="font-size:12px;font-weight:400;color:var(--texte3)">FCFA</span></div>
+    </div>
+    ${btns?`<div class="cmd-actions">${btns}</div>`:''}
+  </div>`;
 }
 
-async function voirCertificat() {
-  window.open(`${API}/api/certificat/${MERCHANT_ID}/view`, '_blank');
+async function changerStatut(id, statut){
+  if(statut==='annulé' && !confirm('Confirmer l\'annulation ?')) return;
+  try{
+    await fetch(`${API}/api/commandes/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({statut,marchand_id:MARCHAND_ID})});
+    showToast(statut==='livré'?'🎉 Livraison confirmée !':statut==='annulé'?'❌ Commande annulée':'✅ Statut mis à jour');
+    chargerDashboard();
+    if(document.getElementById('page-commandes').classList.contains('active')) chargerCommandes(commandesFiltrees);
+  }catch(e){ showToast('❌ Erreur'); }
 }
 
-// ============================================
-// MULTI-LIVREURS
-// ============================================
-async function chargerLivreurs() {
-  try {
-    const r = await fetch(`${API}/api/livreurs/${MERCHANT_ID}`);
-    const livreurs = await r.json();
-    const el = document.getElementById('livreurs-liste');
-    if (!livreurs.length) {
-      el.innerHTML = '<div style="text-align:center;color:#888;font-size:13px;padding:10px">Aucun livreur — ajoutez votre premier livreur</div>';
-      return;
-    }
-    el.innerHTML = livreurs.map(l => `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #bbdefb">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:36px;height:36px;border-radius:50%;background:#1565C0;color:white;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900">${l.nom[0].toUpperCase()}</div>
-          <div>
-            <div style="font-weight:800;font-size:13px">${l.nom}</div>
-            <div style="font-size:11px;color:#888">📍 ${l.zone || 'Zone non définie'} · 📱 ${l.phone || 'N/A'}</div>
+// ── PRODUITS ──
+async function chargerProduits(){
+  try{
+    const r = await fetch(`${API}/api/produits/${MARCHAND_ID}`);
+    produits = await r.json();
+    const el = document.getElementById('liste-produits');
+    if(!produits.length){
+      el.innerHTML='<div class="empty-state"><div class="empty-icon">🛒</div><div class="empty-title">Aucun produit</div><div class="empty-sub">Ajoutez vos produits pour que les acheteurs puissent commander</div><button class="btn-empty" onclick="ouvrirModalProduit()">+ Ajouter un produit</button></div>';
+    } else {
+      el.innerHTML = produits.map(p=>`
+        <div class="prod-card">
+          <div class="prod-emoji">${p.emoji||'📦'}</div>
+          <div style="flex:1">
+            <div class="prod-nom">${p.nom}</div>
+            <div class="prod-prix">${Number(p.prix).toLocaleString('fr-FR')} FCFA/${p.unite}</div>
+            <div class="prod-stock">Stock: ${p.stock_illimite?'∞':p.stock} · ${p.categorie}</div>
+          </div>
+          <div class="prod-actions">
+            <button class="btn-icon" onclick="editerProduit(${p.id})">✏️</button>
+            <button class="btn-icon" onclick="supprimerProduit(${p.id})" style="color:var(--rouge)">🗑️</button>
           </div>
         </div>
-        <div style="display:flex;gap:6px">
-          <a href="/livreur/${MERCHANT_ID}/${l.id}?pin=${l.pin}" target="_blank" style="background:#e3f2fd;color:#1565C0;font-size:10px;font-weight:800;padding:4px 10px;border-radius:10px;text-decoration:none">🔗 Voir</a>
-          <button onclick="supprimerLivreur(${l.id})" style="background:#fce4ec;color:#c0392b;border:none;font-size:10px;font-weight:800;padding:4px 10px;border-radius:10px;cursor:pointer">🗑️</button>
+      `).join('');
+    }
+  }catch(e){}
+}
+
+function ouvrirModalProduit(id=null){
+  document.getElementById('modal-produit-title').textContent = id?'✏️ Modifier produit':'🛒 Nouveau produit';
+  document.getElementById('prod-edit-id').value = id||'';
+  if(!id){
+    ['prod-nom','prod-emoji','prod-prix','prod-prix-gros','prod-stock'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('prod-unite').value='kg';
+    document.getElementById('prod-cat').value='alimentation';
+  }
+  document.getElementById('modal-produit').classList.add('open');
+}
+
+function editerProduit(id){
+  const p = produits.find(p=>p.id===id);
+  if(!p) return;
+  document.getElementById('prod-nom').value=p.nom;
+  document.getElementById('prod-emoji').value=p.emoji||'📦';
+  document.getElementById('prod-prix').value=p.prix;
+  document.getElementById('prod-prix-gros').value=p.prix_gros||p.prix;
+  document.getElementById('prod-unite').value=p.unite||'kg';
+  document.getElementById('prod-stock').value=p.stock;
+  document.getElementById('prod-cat').value=p.categorie||'alimentation';
+  ouvrirModalProduit(id);
+}
+
+async function sauvegarderProduit(){
+  const id = document.getElementById('prod-edit-id').value;
+  const body = {
+    marchand_id: MARCHAND_ID,
+    nom: document.getElementById('prod-nom').value,
+    emoji: document.getElementById('prod-emoji').value||'📦',
+    prix: document.getElementById('prod-prix').value,
+    prix_gros: document.getElementById('prod-prix-gros').value,
+    unite: document.getElementById('prod-unite').value,
+    stock: document.getElementById('prod-stock').value||0,
+    categorie: document.getElementById('prod-cat').value
+  };
+  if(!body.nom||!body.prix){ showToast('❌ Nom et prix obligatoires'); return; }
+  try{
+    const url = id ? `${API}/api/produits/${id}` : `${API}/api/produits`;
+    const method = id ? 'PUT' : 'POST';
+    await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    fermerModal('modal-produit');
+    chargerProduits();
+    showToast(id?'✅ Produit modifié !':'✅ Produit ajouté !');
+  }catch(e){ showToast('❌ Erreur'); }
+}
+
+async function supprimerProduit(id){
+  if(!confirm('Supprimer ce produit ?')) return;
+  try{
+    await fetch(`${API}/api/produits/${id}`,{method:'DELETE'});
+    chargerProduits();
+    showToast('🗑️ Produit supprimé');
+  }catch(e){}
+}
+
+// ── COMMANDE MANUELLE ──
+async function ouvrirModalCommande(){
+  const r = await fetch(`${API}/api/produits/${MARCHAND_ID}`);
+  const prods = await r.json();
+  document.getElementById('cmd-produit').innerHTML = prods.map(p=>`<option value="${p.id}" data-prix="${p.prix}">${p.emoji} ${p.nom} — ${Number(p.prix).toLocaleString('fr-FR')} FCFA/${p.unite}</option>`).join('');
+  document.getElementById('modal-commande').classList.add('open');
+}
+
+async function creerCommande(){
+  const phone = document.getElementById('cmd-phone').value.trim();
+  const sel = document.getElementById('cmd-produit');
+  const opt = sel.options[sel.selectedIndex];
+  const prix = parseFloat(opt?.dataset?.prix||0);
+  const qte = parseInt(document.getElementById('cmd-qte').value)||1;
+  if(!phone){ showToast('❌ Téléphone obligatoire'); return; }
+  try{
+    await fetch(`${API}/api/commandes`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      marchand_id:MARCHAND_ID, acheteur_phone:phone,
+      acheteur_nom:document.getElementById('cmd-nom').value,
+      items:[{nom:opt?.text?.split('—')[0].trim(),quantite:qte,prix}],
+      total:prix*qte,
+      adresse_livraison:document.getElementById('cmd-adresse').value,
+      notes:document.getElementById('cmd-notes').value
+    })});
+    fermerModal('modal-commande');
+    chargerDashboard();
+    showToast('✅ Commande créée !');
+  }catch(e){ showToast('❌ Erreur'); }
+}
+
+// ── ACHETEURS ──
+async function chargerAcheteurs(){
+  try{
+    const r = await fetch(`${API}/api/acheteurs/${MARCHAND_ID}`);
+    const acheteurs = await r.json();
+    const el = document.getElementById('liste-acheteurs');
+    if(!acheteurs.length){
+      el.innerHTML='<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-title">Aucun acheteur</div><div class="empty-sub">Vos acheteurs apparaîtront ici après leur première commande</div></div>';
+    } else {
+      el.innerHTML = acheteurs.map(a=>`
+        <div class="acheteur-card">
+          <div class="acheteur-avatar">👤</div>
+          <div style="flex:1">
+            <div style="font-weight:700;font-size:13px">${a.nom||a.phone}</div>
+            <div style="font-size:11px;color:var(--texte3)">📱 ${a.phone} · ${a.nb_commandes} commande(s)</div>
+            <div style="font-size:11px;color:var(--b);font-weight:600;margin-top:2px">${Number(a.total_achats||0).toLocaleString('fr-FR')} FCFA achetés</div>
+          </div>
+          <a href="https://wa.me/${a.phone}" target="_blank" style="padding:8px 12px;background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.2);border-radius:8px;font-size:11px;font-weight:700;color:#25D366;text-decoration:none">📲</a>
         </div>
-      </div>`).join('');
-  } catch(e) { console.error(e); }
-}
-
-async function ajouterLivreur() {
-  const nom = prompt('Nom du livreur :');
-  if (!nom) return;
-  const phone = prompt('Numéro WhatsApp (ex: 221701234567) :');
-  const zone = prompt('Zone de livraison (ex: Médina, Plateau) :');
-  const pin = prompt('PIN du livreur (4 chiffres) :') || '0000';
-  try {
-    const r = await fetch(`${API}/api/livreurs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ merchant_id: MERCHANT_ID, nom, phone, zone, pin })
-    });
-    const d = await r.json();
-    if (d.ok) { alert(`✅ Livreur ${nom} ajouté !`); chargerLivreurs(); }
-  } catch(e) { alert('Erreur : ' + e.message); }
-}
-
-async function supprimerLivreur(id) {
-  if (!confirm('Supprimer ce livreur ?')) return;
-  await fetch(`${API}/api/livreurs/${id}`, { method: 'DELETE' });
-  chargerLivreurs();
-}
-
-// ============================================
-// PAIEMENTS ÉCHELONNÉS
-// ============================================
-async function chargerEchelonnes() {
-  try {
-    const r = await fetch(`${API}/api/paiements-echelonnes/${MERCHANT_ID}`);
-    const paiements = await r.json();
-    const el = document.getElementById('echelonnes-liste');
-    if (!paiements.length) {
-      el.innerHTML = '<div style="text-align:center;color:#888;font-size:13px;padding:10px">Aucun paiement échelonné en cours</div>';
-      return;
+      `).join('');
     }
-    el.innerHTML = paiements.map(p => `
-      <div style="padding:10px 0;border-bottom:1px solid #ce93d8">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <div style="font-weight:800;font-size:13px">${p.reference || '#'+p.order_id}</div>
-          <span style="background:${p.statut==='soldé'?'#e8f5e9':'#fff3e0'};color:${p.statut==='soldé'?'#006633':'#e65100'};font-size:10px;font-weight:800;padding:3px 9px;border-radius:10px">${p.statut==='soldé'?'✅ Soldé':'⏳ En cours'}</span>
-        </div>
-        <div style="font-size:11px;color:#888">Total: ${Number(p.montant_total).toLocaleString('fr-FR')} F · Acompte: ${Number(p.acompte).toLocaleString('fr-FR')} F · Reste: <b style="color:#c0392b">${Number(p.reste).toLocaleString('fr-FR')} F</b></div>
-        ${p.statut !== 'soldé' && p.reste > 0 ? `<button onclick="solderPaiement(${p.order_id})" style="margin-top:6px;background:#006633;color:white;border:none;font-size:10px;font-weight:800;padding:4px 12px;border-radius:10px;cursor:pointer">✅ Marquer soldé</button>` : ''}
-      </div>`).join('');
-  } catch(e) { console.error(e); }
+  }catch(e){}
 }
 
-async function ouvrirModalEchelonne() {
-  const orderId = prompt('Numéro de commande (ID) :');
-  if (!orderId) return;
-  const pct = prompt('Pourcentage acompte (défaut: 50%) :') || '50';
-  try {
-    const r = await fetch(`${API}/api/paiement-echelonne`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_id: parseInt(orderId), merchant_id: MERCHANT_ID, pourcentage_acompte: parseInt(pct) })
-    });
-    const d = await r.json();
-    if (d.ok) {
-      alert(`✅ Paiement échelonné créé !\nAcompte: ${Number(d.acompte).toLocaleString('fr-FR')} FCFA\nReste: ${Number(d.reste).toLocaleString('fr-FR')} FCFA\n\nLe client a été notifié sur WhatsApp !`);
-      chargerEchelonnes();
-    }
-  } catch(e) { alert('Erreur : ' + e.message); }
+// ── PARAMÈTRES ──
+async function sauvegarderProfil(){
+  try{
+    await fetch(`${API}/api/marchand/${MARCHAND_ID}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      nom_boutique:document.getElementById('p-nom').value,
+      description:document.getElementById('p-desc').value,
+      ville:document.getElementById('p-ville').value,
+      zone:document.getElementById('p-zone').value
+    })});
+    showToast('✅ Profil enregistré !');
+  }catch(e){ showToast('❌ Erreur'); }
 }
 
-async function solderPaiement(orderId) {
-  if (!confirm('Confirmer que le reste a été payé ?')) return;
-  const r = await fetch(`${API}/api/paiement-echelonne/${orderId}/solder`, { method: 'POST' });
-  const d = await r.json();
-  if (d.ok) { alert('✅ Paiement soldé ! Client notifié.'); chargerEchelonnes(); }
+async function changerPIN(){
+  const actuel=document.getElementById('pin-actuel').value.trim();
+  const nouveau=document.getElementById('pin-nouveau').value.trim();
+  const confirm=document.getElementById('pin-confirm').value.trim();
+  const msg=document.getElementById('pin-msg');
+  if(!actuel||actuel.length!==4){msg.style.color='var(--rouge)';msg.textContent='❌ PIN actuel requis (4 chiffres)';return;}
+  if(!nouveau||nouveau.length!==4){msg.style.color='var(--rouge)';msg.textContent='❌ Nouveau PIN doit être 4 chiffres';return;}
+  if(nouveau!==confirm){msg.style.color='var(--rouge)';msg.textContent='❌ PINs ne correspondent pas';return;}
+  try{
+    const r=await fetch(`${API}/api/marchand/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({marchand_id:MARCHAND_ID,pin:actuel})});
+    const d=await r.json();
+    if(!d.ok){msg.style.color='var(--rouge)';msg.textContent='❌ PIN actuel incorrect';return;}
+    // Update PIN via server
+    await fetch(`${API}/api/marchand/${MARCHAND_ID}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:nouveau})});
+    msg.style.color='var(--vert)';msg.textContent='✅ PIN changé !';
+    ['pin-actuel','pin-nouveau','pin-confirm'].forEach(i=>document.getElementById(i).value='');
+  }catch(e){msg.style.color='var(--rouge)';msg.textContent='❌ Erreur';}
 }
 
-// ============================================
-// FOURNISSEURS
-// ============================================
-async function chargerFournisseurs() {
-  try {
-    const r = await fetch(`${API}/api/fournisseurs/merchant/${MERCHANT_ID}`);
-    const fournisseurs = await r.json();
-    const el = document.getElementById('fournisseurs-liste');
-    if (!fournisseurs.length) {
-      el.innerHTML = `<div style="text-align:center;padding:16px">
-        <div style="font-size:32px;margin-bottom:8px">🏭</div>
-        <div style="font-size:13px;color:#888;margin-bottom:12px">Aucun fournisseur lié — découvrez les fournisseurs MarchandPro</div>
-        <button onclick="voirTousFournisseurs()" style="background:#5E35B1;color:white;border:none;padding:10px 20px;border-radius:50px;font-size:12px;font-weight:800;cursor:pointer">🔍 Voir tous les fournisseurs</button>
-      </div>`;
-      return;
-    }
-    el.innerHTML = fournisseurs.map(f => `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #d1c4e9">
-        <div>
-          <div style="font-weight:800;font-size:13px">🏭 ${f.nom_boutique}</div>
-          <div style="font-size:11px;color:#888">📍 ${f.ville} · ${f.nb_commandes||0} commande(s) · ${Number(f.total_achats||0).toLocaleString('fr-FR')} FCFA</div>
-        </div>
-        <button onclick="passerCommande(${f.id},'${f.nom_boutique}')" style="background:#5E35B1;color:white;border:none;font-size:10px;font-weight:800;padding:6px 12px;border-radius:10px;cursor:pointer">📦 Commander</button>
-      </div>`).join('') +
-      `<div style="margin-top:10px;text-align:center">
-        <button onclick="voirTousFournisseurs()" style="background:#f4f0ff;color:#5E35B1;border:none;font-size:11px;font-weight:800;padding:8px 16px;border-radius:10px;cursor:pointer">🔍 Voir tous les fournisseurs</button>
-      </div>`;
-  } catch(e) { console.error(e); }
+function copierLien(){
+  const lien=`${API}/commande?id=${MARCHAND_ID}`;
+  navigator.clipboard.writeText(lien).then(()=>showToast('📋 Lien copié !')).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=lien;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);showToast('📋 Lien copié !');
+  });
 }
 
-async function voirTousFournisseurs() {
-  window.open(`${API}/fournisseurs`, '_blank');
+// ── NAVIGATION ──
+function showPage(page, btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.bnav-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(page==='commandes') chargerCommandes(commandesFiltrees);
+  if(page==='acheteurs') chargerAcheteurs();
+  if(page==='produits') chargerProduits();
 }
 
-async function passerCommande(fournisseurId, nomFournisseur) {
-  const produit = prompt(`Commander chez ${nomFournisseur}\n\nNom du produit :`);
-  if (!produit) return;
-  const qte = prompt('Quantité :');
-  if (!qte || isNaN(qte)) return;
-  const prix = prompt('Prix unitaire (FCFA) :');
-  if (!prix || isNaN(prix)) return;
-  const notes = prompt('Note (optionnel) :') || '';
-  try {
-    const r = await fetch(`${API}/api/commande-fournisseur`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        merchant_id: MERCHANT_ID,
-        fournisseur_id: fournisseurId,
-        items: [{ nom: produit, quantite: parseInt(qte), prix: parseFloat(prix) }],
-        notes
-      })
-    });
-    const d = await r.json();
-    if (d.ok) {
-      alert(`✅ Commande envoyée à ${nomFournisseur} !\n\nTotal : ${Number(d.order.total).toLocaleString('fr-FR')} FCFA\nCommission MarchandPro : ${Number(d.commission_appliquee).toLocaleString('fr-FR')} FCFA\n\nLe fournisseur a été notifié sur WhatsApp !`);
-      chargerFournisseurs();
-    }
-  } catch(e) { alert('Erreur : ' + e.message); }
+function fermerModal(id){
+  document.getElementById(id).classList.remove('open');
 }
 
-async function commanderFournisseur() {
-  // Charger liste fournisseurs disponibles
-  try {
-    const r = await fetch(`${API}/api/fournisseurs`);
-    const fournisseurs = await r.json();
-    if (!fournisseurs.length) {
-      alert('Aucun fournisseur disponible pour l\'instant.\n\nContactez MarchandPro pour référencer votre fournisseur 📞');
-      return;
-    }
-    const liste = fournisseurs.map((f, i) => `${i+1}. ${f.nom_boutique} (${f.ville})`).join('\n');
-    const choix = prompt(`Choisissez un fournisseur (numéro) :\n\n${liste}`);
-    if (!choix || isNaN(choix)) return;
-    const f = fournisseurs[parseInt(choix)-1];
-    if (!f) return;
-    passerCommande(f.id, f.nom_boutique);
-  } catch(e) { alert('Erreur : ' + e.message); }
+// ── GUIDE ──
+function demarrerGuide(){
+  localStorage.setItem('mp_guided_'+MARCHAND_ID,'1');
+  document.getElementById('guide-banner').style.display='none';
+  showToast('👋 Commencez par ajouter vos produits !');
+  setTimeout(()=>showPage('produits', document.querySelectorAll('.bnav-tab')[2]),1000);
 }
 
-// Vérifier login au démarrage
-if (checkLogin()) {
-  loadDashboard();
-  chargerCredits();
-  chargerMarges();
-  chargerLivreurs();
-  chargerEchelonnes();
-  chargerFournisseurs();
+function afficherResetPin(){ showToast('Contactez le support MarchandPro'); }
+
+// ── TOAST ──
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.style.display='block';
+  setTimeout(()=>t.style.display='none',3000);
 }
-setInterval(() => { if (getSession()) loadDashboard(); }, 30000);
 </script>
 </body>
 </html>
