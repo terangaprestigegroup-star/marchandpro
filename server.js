@@ -33,6 +33,23 @@ const pool = new Pool({
 // ============================================
 // INIT DB
 // ============================================
+// ============================================
+// CATÉGORIES GROSSISTES
+// ============================================
+const CATEGORIES = [
+  { id: 'alimentation', label: 'Alimentation & Boissons', emoji: '🌾', exemples: 'Riz, sucre, huile, lait, café, pâtes' },
+  { id: 'frais', label: 'Frais & Halieutiques', emoji: '🐟', exemples: 'Poisson, viande, volaille, fruits, légumes' },
+  { id: 'quincaillerie', label: 'Quincaillerie & BTP', emoji: '🔧', exemples: 'Outils, aluminium, bois, ciment' },
+  { id: 'hygiene', label: 'Hygiène & Beauté', emoji: '🧼', exemples: 'Entretien, cosmétiques, parapharmacie' },
+  { id: 'bebe', label: 'Bébé & Animalerie', emoji: '👶', exemples: 'Couches, biberons, aliments bébé' },
+  { id: 'textile', label: 'Textile & Friperie', emoji: '👗', exemples: 'Vêtements, tissus, wax, bazin' },
+  { id: 'electronique', label: 'Électronique', emoji: '📱', exemples: 'Téléphones, accessoires, électroménager' },
+  { id: 'import-export', label: 'Import-Export', emoji: '🌍', exemples: 'Négoce international, marchandises générales' },
+  { id: 'general', label: 'Général', emoji: '📦', exemples: 'Tout autre type de produit' },
+];
+
+app.get('/api/categories', (req, res) => res.json(CATEGORIES));
+
 async function initDB() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS marchands (
