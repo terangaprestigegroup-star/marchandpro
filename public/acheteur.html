@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Commander — MarchandPro</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--b:#1B4332;--b2:#2D6A4F;--or:#D4A017;--bg:#F0F7F4;--bg2:#E0EFE8;--card:#fff;--texte:#0D1F16;--texte2:#2D5A3D;--texte3:#6B8F7A;--border:#C8DDD2;--rouge:#C0392B;--vert:#1B4332}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--texte);min-height:100vh}
+
+.header{background:linear-gradient(135deg,var(--b),var(--b2));padding:20px 16px;color:#fff}
+.header-logo{font-size:11px;font-weight:600;opacity:.6;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.header-nom{font-family:'Playfair Display',serif;font-size:22px;font-weight:700}
+.header-sub{font-size:12px;opacity:.7;margin-top:4px}
+
+.content{padding:16px 14px 100px}
+.section-title{font-size:11px;font-weight:700;color:var(--texte3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+
+.prod-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(27,67,50,.06)}
+.prod-emoji{width:52px;height:52px;border-radius:14px;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+.prod-info{flex:1}
+.prod-nom{font-weight:700;font-size:14px;color:var(--texte)}
+.prod-prix{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--b);margin-top:2px}
+.prod-unite{font-size:11px;color:var(--texte3)}
+
+.counter{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.counter-btn{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border);background:var(--bg2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-weight:700;touch-action:manipulation}
+.counter-btn.add{background:var(--b);color:#fff;border-color:var(--b)}
+.counter-val{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--texte);min-width:20px;text-align:center}
+
+/* PANIER STICKY */
+.panier-bar{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);padding:12px 14px;display:none;box-shadow:0 -4px 20px rgba(27,67,50,.1)}
+.panier-bar.show{display:block}
+.panier-info{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.panier-total{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--texte)}
+.panier-count{font-size:12px;color:var(--texte3)}
+.btn-commander{width:100%;padding:14px;background:linear-gradient(135deg,var(--b),var(--b2));color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;touch-action:manipulation}
+
+/* MODAL INFOS */
+.overlay{position:fixed;inset:0;background:rgba(13,31,22,.6);z-index:500;display:none;align-items:flex-end;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--card);border-radius:24px 24px 0 0;padding:24px 16px 32px;width:100%;max-width:480px}
+.modal-title{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--texte);margin-bottom:16px}
+.form-group{margin-bottom:14px}
+.form-label{font-size:11px;font-weight:700;color:var(--texte3);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px}
+.form-input{width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;color:var(--texte);background:#fff;font-family:'DM Sans',sans-serif;outline:none}
+.form-input:focus{border-color:var(--b)}
+.btn-submit{width:100%;padding:14px;background:linear-gradient(135deg,var(--b),var(--b2));color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;margin-bottom:10px;touch-action:manipulation}
+.btn-cancel{width:100%;padding:12px;background:transparent;color:var(--texte3);border:1px solid var(--border);border-radius:10px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif}
+
+/* RÉSUMÉ COMMANDE */
+.resume-item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.resume-total{display:flex;justify-content:space-between;padding:12px 0;font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--texte)}
+
+/* SUCCESS */
+.success-card{background:linear-gradient(135deg,var(--b),var(--b2));border-radius:20px;padding:32px 20px;text-align:center;color:#fff;margin:20px 0}
+.success-icon{font-size:56px;margin-bottom:16px}
+.success-title{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;margin-bottom:8px}
+.success-sub{font-size:13px;opacity:.7;line-height:1.6}
+.success-ref{font-size:18px;font-weight:700;color:var(--or);margin:12px 0;letter-spacing:2px}
+
+.toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#1B4332;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:999;display:none;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<div id="main">
+  <div class="header">
+    <div class="header-logo">🏪 MarchandPro</div>
+    <div class="header-nom" id="header-nom">Chargement...</div>
+    <div class="header-sub" id="header-sub">Passez votre commande</div>
+  </div>
+
+  <div class="content">
+    <div class="section-title">🛒 Nos produits</div>
+    <div id="liste-produits">
+      <div style="text-align:center;padding:40px;color:var(--texte3)">⏳ Chargement...</div>
+    </div>
+  </div>
+</div>
+
+<!-- PANIER -->
+<div class="panier-bar" id="panier-bar">
+  <div class="panier-info">
+    <div>
+      <div class="panier-count" id="panier-count">0 article(s)</div>
+      <div class="panier-total" id="panier-total">0 FCFA</div>
+    </div>
+    <button onclick="voirPanier()" style="padding:8px 16px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;color:var(--texte2)">Voir panier</button>
+  </div>
+  <button class="btn-commander" onclick="ouvrirInfos()">🛒 Commander maintenant</button>
+</div>
+
+<!-- MODAL PANIER -->
+<div class="overlay" id="overlay-panier">
+  <div class="modal">
+    <div class="modal-title">🛒 Mon panier</div>
+    <div id="panier-items"></div>
+    <div class="resume-total"><span>Total</span><span id="panier-total-modal">0 FCFA</span></div>
+    <button class="btn-submit" onclick="ouvrirInfos()">✅ Confirmer la commande</button>
+    <button class="btn-cancel" onclick="fermerOverlay('overlay-panier')">Continuer mes achats</button>
+  </div>
+</div>
+
+<!-- MODAL INFOS -->
+<div class="overlay" id="overlay-infos">
+  <div class="modal">
+    <div class="modal-title">📝 Vos informations</div>
+    <div class="form-group"><label class="form-label">Votre nom *</label><input class="form-input" id="acheteur-nom" placeholder="Prénom et nom"></div>
+    <div class="form-group"><label class="form-label">Téléphone WhatsApp *</label><input class="form-input" id="acheteur-phone" type="tel" placeholder="77 123 45 67"></div>
+    <div class="form-group"><label class="form-label">Adresse de livraison</label><input class="form-input" id="acheteur-adresse" placeholder="Quartier, rue, point de repère"></div>
+    <div class="form-group"><label class="form-label">Notes (optionnel)</label><input class="form-input" id="acheteur-notes" placeholder="Instructions spéciales..."></div>
+    <button class="btn-submit" onclick="passerCommande()">🛒 Passer la commande</button>
+    <button class="btn-cancel" onclick="fermerOverlay('overlay-infos')">Retour</button>
+  </div>
+</div>
+
+<!-- SUCCESS -->
+<div id="success-page" style="display:none;padding:20px">
+  <div class="success-card">
+    <div class="success-icon">🎉</div>
+    <div class="success-title">Commande envoyée !</div>
+    <div class="success-ref" id="success-ref"></div>
+    <div class="success-sub">Vous recevrez une confirmation sur WhatsApp.<br>Le marchand vous contactera pour la livraison.</div>
+  </div>
+  <div style="background:var(--card);border-radius:16px;padding:16px;margin-top:16px">
+    <div style="font-weight:700;font-size:14px;margin-bottom:12px">📋 Récapitulatif</div>
+    <div id="success-resume"></div>
+  </div>
+  <button onclick="location.reload()" style="width:100%;padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;color:var(--texte2);margin-top:16px;font-family:'DM Sans',sans-serif">🛒 Nouvelle commande</button>
+</div>
+
+<script>
+const API = window.location.origin;
+const params = new URLSearchParams(window.location.search);
+const MARCHAND_ID = parseInt(params.get('id'))||1;
+let panier = {};
+let produits = [];
+
+// Charger marchand + produits
+async function init(){
+  try{
+    const [mRes, pRes] = await Promise.all([
+      fetch(`${API}/api/marchand/${MARCHAND_ID}`),
+      fetch(`${API}/api/produits/${MARCHAND_ID}`)
+    ]);
+    const marchand = await mRes.json();
+    produits = await pRes.json();
+    
+    document.getElementById('header-nom').textContent = marchand.nom_boutique;
+    document.getElementById('header-sub').textContent = marchand.description || 'Passez votre commande';
+    document.title = marchand.nom_boutique + ' — Commander';
+    
+    renderProduits();
+  }catch(e){
+    document.getElementById('liste-produits').innerHTML='<div style="text-align:center;padding:40px;color:var(--rouge)">❌ Erreur de chargement</div>';
+  }
+}
+
+function renderProduits(){
+  const el = document.getElementById('liste-produits');
+  const dispos = produits.filter(p=>p.disponible);
+  if(!dispos.length){
+    el.innerHTML='<div style="text-align:center;padding:40px;color:var(--texte3)"><div style="font-size:40px;margin-bottom:12px">🛒</div><div style="font-size:14px;font-weight:700">Aucun produit disponible</div></div>';
+    return;
+  }
+  el.innerHTML = dispos.map(p=>`
+    <div class="prod-card">
+      <div class="prod-emoji">${p.emoji||'📦'}</div>
+      <div class="prod-info">
+        <div class="prod-nom">${p.nom}</div>
+        <div class="prod-prix">${Number(p.prix).toLocaleString('fr-FR')} FCFA</div>
+        <div class="prod-unite">par ${p.unite}${!p.stock_illimite&&p.stock<10?` · Stock: ${p.stock}`:''}</div>
+      </div>
+      <div class="counter">
+        <button class="counter-btn" onclick="modifierQte(${p.id},-1)">−</button>
+        <div class="counter-val" id="qte-${p.id}">${panier[p.id]||0}</div>
+        <button class="counter-btn add" onclick="modifierQte(${p.id},1)">+</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function modifierQte(id, delta){
+  const current = panier[id]||0;
+  const nouveau = Math.max(0, current+delta);
+  if(nouveau===0) delete panier[id]; else panier[id]=nouveau;
+  const el = document.getElementById('qte-'+id);
+  if(el) el.textContent = nouveau;
+  mettreAJourPanier();
+}
+
+function mettreAJourPanier(){
+  const total = Object.entries(panier).reduce((s,[id,qte])=>{
+    const p = produits.find(p=>p.id===parseInt(id));
+    return s + (p?.prix||0)*qte;
+  },0);
+  const count = Object.values(panier).reduce((s,q)=>s+q,0);
+  document.getElementById('panier-count').textContent = count+' article(s)';
+  document.getElementById('panier-total').textContent = Number(total).toLocaleString('fr-FR')+' FCFA';
+  document.getElementById('panier-total-modal').textContent = Number(total).toLocaleString('fr-FR')+' FCFA';
+  document.getElementById('panier-bar').classList.toggle('show', count>0);
+}
+
+function voirPanier(){
+  const el = document.getElementById('panier-items');
+  el.innerHTML = Object.entries(panier).map(([id,qte])=>{
+    const p = produits.find(p=>p.id===parseInt(id));
+    if(!p) return '';
+    return `<div class="resume-item">
+      <span>${p.emoji} ${p.nom} × ${qte}</span>
+      <span style="font-weight:700">${Number(p.prix*qte).toLocaleString('fr-FR')} FCFA</span>
+    </div>`;
+  }).join('');
+  document.getElementById('overlay-panier').classList.add('open');
+}
+
+function ouvrirInfos(){
+  fermerOverlay('overlay-panier');
+  document.getElementById('overlay-infos').classList.add('open');
+}
+
+function fermerOverlay(id){ document.getElementById(id).classList.remove('open'); }
+
+async function passerCommande(){
+  const nom = document.getElementById('acheteur-nom').value.trim();
+  const phone = document.getElementById('acheteur-phone').value.trim();
+  if(!nom){ showToast('❌ Entrez votre nom'); return; }
+  if(!phone){ showToast('❌ Entrez votre téléphone'); return; }
+  if(!Object.keys(panier).length){ showToast('❌ Panier vide'); return; }
+
+  const items = Object.entries(panier).map(([id,qte])=>{
+    const p = produits.find(p=>p.id===parseInt(id));
+    return { nom:p.nom, quantite:qte, prix:p.prix, emoji:p.emoji };
+  });
+  const total = items.reduce((s,i)=>s+i.prix*i.quantite,0);
+
+  try{
+    const r = await fetch(`${API}/api/commandes`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        marchand_id:MARCHAND_ID, acheteur_nom:nom,
+        acheteur_phone:phone.replace(/[^0-9]/g,''),
+        items, total,
+        adresse_livraison:document.getElementById('acheteur-adresse').value,
+        notes:document.getElementById('acheteur-notes').value
+      })
+    });
+    const d = await r.json();
+    if(d.ok){
+      fermerOverlay('overlay-infos');
+      afficherSucces(d.commande, items, total);
+    }
+  }catch(e){ showToast('❌ Erreur réseau'); }
+}
+
+function afficherSucces(cmd, items, total){
+  document.getElementById('main').style.display='none';
+  document.getElementById('panier-bar').style.display='none';
+  document.getElementById('success-page').style.display='block';
+  document.getElementById('success-ref').textContent = cmd.reference;
+  document.getElementById('success-resume').innerHTML =
+    items.map(i=>`<div class="resume-item"><span>${i.emoji} ${i.nom} × ${i.quantite}</span><span style="font-weight:700">${Number(i.prix*i.quantite).toLocaleString('fr-FR')} FCFA</span></div>`).join('')+
+    `<div class="resume-total"><span>Total</span><span>${Number(total).toLocaleString('fr-FR')} FCFA</span></div>`;
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';
+  setTimeout(()=>t.style.display='none',3000);
+}
+
+init();
+</script>
+</body>
+</html>
