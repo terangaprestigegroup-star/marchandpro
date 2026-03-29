@@ -168,7 +168,7 @@ let catActive = 'tous';
 function renderCatFilter(){
   const cats = [...new Set(produits.filter(p=>p.disponible).map(p=>p.categorie))];
   const el = document.getElementById('cat-filter');
-  if(cats.length < 2){ el.style.display='none'; return; }
+  if(!cats.length){ el.style.display='none'; return; }
   const labels = {
     alimentation:'🌾 Alimentation', frais:'🐟 Frais', quincaillerie:'🔧 Quincaillerie',
     hygiene:'🧼 Hygiène', bebe:'👶 Bébé', textile:'👗 Textile',
