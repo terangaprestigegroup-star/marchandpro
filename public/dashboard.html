@@ -232,6 +232,26 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--texte);mi
   <div id="liste-acheteurs"></div>
 </div>
 
+<!-- LIVREURS -->
+<div id="page-livreurs" class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <div class="section-title" style="margin:0">🚚 Mes livreurs</div>
+    <button onclick="ouvrirModalLivreur()" style="padding:8px 14px;background:linear-gradient(135deg,var(--b),var(--b2));color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">+ Ajouter</button>
+  </div>
+  <div id="liste-livreurs"></div>
+
+  <!-- CALCUL PAIE -->
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-top:14px">
+    <div style="font-family:'Playfair Display',serif;font-size:15px;font-weight:700;margin-bottom:12px">💰 Calcul de paie</div>
+    <div class="form-group">
+      <label class="form-label">Tarif par livraison (FCFA)</label>
+      <input class="form-input" id="tarif-liv" type="number" value="1000" placeholder="1000">
+    </div>
+    <button onclick="calculerPaie()" style="width:100%;padding:10px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;color:var(--texte2)">📊 Calculer</button>
+    <div id="paie-result" style="margin-top:12px"></div>
+  </div>
+</div>
+
 <!-- PARAMÈTRES -->
 <div id="page-params" class="page">
   <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px">
@@ -266,7 +286,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--texte);mi
   <button class="bnav-tab active" onclick="showPage('accueil',this)"><span>📊</span>Accueil</button>
   <button class="bnav-tab" onclick="showPage('commandes',this)"><span>📦</span>Commandes</button>
   <button class="bnav-tab" onclick="showPage('produits',this)"><span>🛒</span>Produits</button>
-  <button class="bnav-tab" onclick="showPage('acheteurs',this)"><span>👥</span>Acheteurs</button>
+  <button class="bnav-tab" onclick="showPage('livreurs',this)"><span>🚚</span>Livreurs</button>
   <button class="bnav-tab" onclick="showPage('params',this)"><span>⚙️</span>Paramètres</button>
 </div>
 
@@ -282,6 +302,26 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--texte);mi
     <div class="form-group"><label class="form-label">Notes</label><input class="form-input" id="cmd-notes" placeholder="Instructions spéciales..."></div>
     <button class="btn-submit" onclick="creerCommande()">✅ Créer commande</button>
     <button class="btn-cancel" onclick="fermerModal('modal-commande')">Annuler</button>
+  </div>
+</div>
+
+<!-- MODAL LIVREUR -->
+<div class="modal-overlay" id="modal-livreur">
+  <div class="modal">
+    <div class="modal-title">🚚 Nouveau livreur</div>
+    <div class="form-group"><label class="form-label">Nom *</label><input class="form-input" id="liv-nom" placeholder="Prénom et nom"></div>
+    <div class="form-group"><label class="form-label">Téléphone *</label><input class="form-input" id="liv-phone" type="tel" placeholder="77 123 45 67"></div>
+    <div class="form-group"><label class="form-label">Transport</label>
+      <select class="form-select" id="liv-transport">
+        <option value="Moto">🏍️ Moto</option>
+        <option value="Vélo">🚲 Vélo</option>
+        <option value="Voiture">🚗 Voiture</option>
+        <option value="Tricycle">🛺 Tricycle</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Zone</label><input class="form-input" id="liv-zone" placeholder="Ex: Médina, Plateau..."></div>
+    <button class="btn-submit" onclick="sauvegarderLivreur()">✅ Ajouter le livreur</button>
+    <button class="btn-cancel" onclick="fermerModal('modal-livreur')">Annuler</button>
   </div>
 </div>
 
@@ -663,6 +703,111 @@ function copierLien(){
   });
 }
 
+// ── LIVREURS ──
+async function chargerLivreurs(){
+  try{
+    const r = await fetch(`${API}/api/livreurs/${MARCHAND_ID}`);
+    const livs = await r.json();
+    const el = document.getElementById('liste-livreurs');
+    if(!livs.length){
+      el.innerHTML=`<div class="empty-state">
+        <div class="empty-icon">🚚</div>
+        <div class="empty-title">Aucun livreur</div>
+        <div class="empty-sub">Ajoutez votre premier livreur pour gérer les livraisons</div>
+        <button class="btn-empty" onclick="ouvrirModalLivreur()">+ Ajouter un livreur</button>
+      </div>`;
+      return;
+    }
+    el.innerHTML = livs.map(l=>{
+      const taux = l.nb_livraisons>0 ? Math.round((l.nb_livrees||0)/l.nb_livraisons*100) : 0;
+      const transport = {Moto:'🏍️',Vélo:'🚲',Voiture:'🚗',Tricycle:'🛺'}[l.transport]||'🏍️';
+      return `<div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:10px;box-shadow:var(--card-shadow)">
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:10px">
+          <div style="width:44px;height:44px;border-radius:12px;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">${transport}</div>
+          <div style="flex:1">
+            <div style="font-weight:700;font-size:14px">${l.nom}</div>
+            <div style="font-size:11px;color:var(--texte3)">📱 ${l.telephone} · ${l.zone||'Dakar'}</div>
+          </div>
+          <span style="background:rgba(27,67,50,.1);color:var(--b);padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700">🟢 Dispo</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+          <div style="background:var(--bg2);border-radius:8px;padding:8px;text-align:center">
+            <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700">${l.nb_livraisons||0}</div>
+            <div style="font-size:9px;color:var(--texte3);text-transform:uppercase">Total</div>
+          </div>
+          <div style="background:var(--bg2);border-radius:8px;padding:8px;text-align:center">
+            <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--vert)">${l.nb_livrees||0}</div>
+            <div style="font-size:9px;color:var(--texte3);text-transform:uppercase">Livrées</div>
+          </div>
+          <div style="background:var(--bg2);border-radius:8px;padding:8px;text-align:center">
+            <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--or)">${taux}%</div>
+            <div style="font-size:9px;color:var(--texte3);text-transform:uppercase">Taux</div>
+          </div>
+        </div>
+        <div style="height:4px;background:var(--bg2);border-radius:4px;margin-bottom:10px">
+          <div style="height:4px;background:linear-gradient(90deg,var(--b),var(--or));border-radius:4px;width:${taux}%"></div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <a href="https://wa.me/${l.telephone.replace(/[^0-9]/g,'')}" target="_blank" style="flex:1;padding:8px;border-radius:8px;background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.2);color:#25D366;font-size:11px;font-weight:700;text-decoration:none;text-align:center">📲 WhatsApp</a>
+          <button onclick="supprimerLivreur(${l.id})" style="padding:8px 12px;border-radius:8px;border:1px solid rgba(192,57,43,.2);background:rgba(192,57,43,.05);font-size:11px;cursor:pointer;color:var(--rouge)">🗑️</button>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){}
+}
+
+function ouvrirModalLivreur(){
+  ['liv-nom','liv-phone','liv-zone'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('modal-livreur').classList.add('open');
+}
+
+async function sauvegarderLivreur(){
+  const nom=document.getElementById('liv-nom').value.trim();
+  const phone=document.getElementById('liv-phone').value.trim();
+  if(!nom||!phone){showToast('❌ Nom et téléphone obligatoires');return;}
+  try{
+    await fetch(`${API}/api/livreurs`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      marchand_id:MARCHAND_ID,nom,telephone:phone.replace(/[^0-9]/g,''),
+      transport:document.getElementById('liv-transport').value,
+      zone:document.getElementById('liv-zone').value
+    })});
+    fermerModal('modal-livreur');
+    chargerLivreurs();
+    showToast('✅ Livreur ajouté !');
+  }catch(e){showToast('❌ Erreur');}
+}
+
+async function supprimerLivreur(id){
+  if(!confirm('Supprimer ce livreur ?')) return;
+  try{
+    await fetch(`${API}/api/livreurs/${id}`,{method:'DELETE'});
+    chargerLivreurs();
+    showToast('🗑️ Livreur supprimé');
+  }catch(e){}
+}
+
+async function calculerPaie(){
+  const tarif = parseInt(document.getElementById('tarif-liv').value)||1000;
+  try{
+    const r = await fetch(`${API}/api/livreurs/${MARCHAND_ID}`);
+    const livs = await r.json();
+    const el = document.getElementById('paie-result');
+    if(!livs.length){el.innerHTML='<div style="color:var(--texte3);font-size:12px;text-align:center">Aucun livreur</div>';return;}
+    let total = 0;
+    el.innerHTML = livs.map(l=>{
+      const nb = l.nb_livrees||0;
+      const montant = nb*tarif;
+      total += montant;
+      return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
+        <div><div style="font-weight:600">${l.nom}</div><div style="font-size:11px;color:var(--texte3)">${nb} livraison(s) × ${tarif.toLocaleString('fr-FR')} FCFA</div></div>
+        <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--b)">${montant.toLocaleString('fr-FR')}</div>
+      </div>`;
+    }).join('') + `<div style="display:flex;justify-content:space-between;padding:12px 0;font-family:'Playfair Display',serif;font-size:18px;font-weight:700">
+      <span>Total</span><span style="color:var(--b)">${total.toLocaleString('fr-FR')} FCFA</span>
+    </div>`;
+  }catch(e){}
+}
+
 // ── NAVIGATION ──
 function showPage(page, btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -672,6 +817,7 @@ function showPage(page, btn){
   if(page==='commandes') chargerCommandes(commandesFiltrees);
   if(page==='acheteurs') chargerAcheteurs();
   if(page==='produits') chargerProduits();
+  if(page==='livreurs') chargerLivreurs();
 }
 
 function fermerModal(id){
