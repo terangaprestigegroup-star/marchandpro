@@ -164,7 +164,14 @@ async function initDB() {
       ($1, 'Huile végétale', 1200, 1100, 'litre', 500, 'alimentation', '🛢️', true),
       ($1, 'Sucre', 700, 650, 'kg', 800, 'alimentation', '🍬', true),
       ($1, 'Farine de blé', 600, 550, 'kg', 600, 'alimentation', '🌾', true),
-      ($1, 'Savon de ménage', 300, 250, 'unité', 2000, 'hygiène', '🧼', true)
+      ($1, 'Lait en poudre', 2500, 2300, 'kg', 300, 'alimentation', '🥛', true),
+      ($1, 'Tomate concentrée', 150, 120, 'unité', 5000, 'alimentation', '🍅', true),
+      ($1, 'Savon de ménage', 300, 250, 'unité', 2000, 'hygiene', '🧼', true),
+      ($1, 'Détergent lessive', 800, 700, 'unité', 1000, 'hygiene', '🧴', true),
+      ($1, 'Téléphone basique', 15000, 13000, 'unité', 50, 'electronique', '📱', true),
+      ($1, 'Chargeur USB', 1500, 1200, 'unité', 200, 'electronique', '🔌', true),
+      ($1, 'Tissu wax 6 yards', 8000, 7000, 'pièce', 100, 'textile', '👗', true),
+      ($1, 'Ciment Portland 50kg', 5500, 5000, 'sac', 500, 'quincaillerie', '🏗️', true)
     `, [mid]);
   }
 
